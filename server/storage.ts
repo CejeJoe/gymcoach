@@ -24,7 +24,10 @@ export interface IStorage {
   // Client methods
   getClientsByCoach(coachId: string): Promise<Client[]>;
   getClientByUserId(userId: string): Promise<Client | undefined>;
+  getClient(clientId: string): Promise<Client | undefined>;
   createClient(client: InsertClient): Promise<Client>;
+  updateClient(clientId: string, updates: Partial<InsertClient>): Promise<Client>;
+  deleteClient(clientId: string): Promise<void>;
   
   // Workout methods
   getWorkoutsByClient(clientId: string): Promise<Workout[]>;
@@ -71,10 +74,30 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async getClientsByCoach(coachId: string): Promise<Client[]> {
+  async getClientsByCoach(coachId: string): Promise<any[]> {
     return await db
-      .select()
+      .select({
+        id: clients.id,
+        userId: clients.userId,
+        coachId: clients.coachId,
+        goals: clients.goals,
+        currentWeight: clients.currentWeight,
+        targetWeight: clients.targetWeight,
+        height: clients.height,
+        startDate: clients.startDate,
+        isActive: clients.isActive,
+        createdAt: clients.createdAt,
+        updatedAt: clients.updatedAt,
+        user: {
+          id: users.id,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          avatar: users.avatar,
+        }
+      })
       .from(clients)
+      .leftJoin(users, eq(clients.userId, users.id))
       .where(and(eq(clients.coachId, coachId), eq(clients.isActive, true)))
       .orderBy(desc(clients.updatedAt));
   }
@@ -87,12 +110,36 @@ export class DatabaseStorage implements IStorage {
     return client || undefined;
   }
 
+  async getClient(clientId: string): Promise<Client | undefined> {
+    const [client] = await db
+      .select()
+      .from(clients)
+      .where(eq(clients.id, clientId));
+    return client || undefined;
+  }
+
   async createClient(insertClient: InsertClient): Promise<Client> {
     const [client] = await db
       .insert(clients)
       .values(insertClient)
       .returning();
     return client;
+  }
+
+  async updateClient(clientId: string, updates: Partial<InsertClient>): Promise<Client> {
+    const [client] = await db
+      .update(clients)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(clients.id, clientId))
+      .returning();
+    return client;
+  }
+
+  async deleteClient(clientId: string): Promise<void> {
+    await db
+      .update(clients)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(clients.id, clientId));
   }
 
   async getWorkoutsByClient(clientId: string): Promise<Workout[]> {

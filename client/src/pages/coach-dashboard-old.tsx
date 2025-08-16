@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FloatingActionButton } from "@/components/ui/floating-action-button";
 import { GlassCard } from "@/components/ui/glass-card";
 import { useTheme } from "@/components/ui/theme-provider";
 import { getAuthHeaders } from "@/lib/auth";
@@ -254,6 +255,70 @@ export default function CoachDashboard({ user, onLogout }: CoachDashboardProps) 
           </div>
         </TabsContent>
       </Tabs>
+
+      </Tabs>
+    </div>
+  );
+}
+                <Users className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
+                <p className="text-muted-foreground">No clients yet</p>
+                <p className="text-sm text-muted-foreground">Add your first client to get started</p>
+              </div>
+            </GlassCard>
+          )}
+        </div>
+
+        {/* Performance Overview */}
+        <GlassCard>
+          <h3 className="font-semibold mb-4">This Week's Performance</h3>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Target className="h-4 w-4 text-thrst-green" />
+                <span className="text-sm">Goals Achieved</span>
+              </div>
+              <Badge variant="secondary" className="bg-thrst-green/10 text-thrst-green">
+                18/24
+              </Badge>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Clock className="h-4 w-4 text-thrst-accent" />
+                <span className="text-sm">Training Hours</span>
+              </div>
+              <Badge variant="secondary" className="bg-thrst-accent/10 text-thrst-accent">
+                32h
+              </Badge>
+            </div>
+          </div>
+        </GlassCard>
+      </div>
+
+      {/* Floating Action Button */}
+      <FloatingActionButton data-testid="floating-add-button" />
+
+      {/* Bottom Navigation */}
+      <nav className="glass-morphism fixed bottom-0 left-0 right-0 p-4 border-t border-white/10">
+        <div className="flex justify-around">
+          <button className="flex flex-col items-center space-y-1 text-thrst-green" data-testid="nav-dashboard">
+            <TrendingUp className="h-5 w-5" />
+            <span className="text-xs">Dashboard</span>
+          </button>
+          <button className="flex flex-col items-center space-y-1 text-muted-foreground" data-testid="nav-clients">
+            <Users className="h-5 w-5" />
+            <span className="text-xs">Clients</span>
+          </button>
+          <button className="flex flex-col items-center space-y-1 text-muted-foreground" data-testid="nav-analytics">
+            <TrendingUp className="h-5 w-5" />
+            <span className="text-xs">Analytics</span>
+          </button>
+          <button className="flex flex-col items-center space-y-1 text-muted-foreground" data-testid="nav-settings">
+            <Calendar className="h-5 w-5" />
+            <span className="text-xs">Settings</span>
+          </button>
+        </div>
+      </nav>
     </div>
   );
 }

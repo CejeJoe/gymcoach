@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { loginSchema, insertUserSchema } from "@shared/schema";
+import { loginSchema, insertUserSchema, insertClientSchema, insertWorkoutSchema, insertProgressEntrySchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 
 const JWT_SECRET = process.env.JWT_SECRET || "thrst-gym-secret-key";
@@ -259,6 +259,136 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(stats);
     } catch (error) {
       console.error('Get client stats error:', error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Client CRUD routes
+  app.post("/api/coach/clients", authenticateToken, async (req: any, res) => {
+    try {
+      if (req.user.role !== 'coach') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const result = insertClientSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ 
+          message: fromZodError(result.error).message 
+        });
+      }
+
+      const client = await storage.createClient({
+        ...result.data,
+        coachId: req.user.userId,
+      });
+      res.status(201).json(client);
+    } catch (error) {
+      console.error('Create client error:', error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.put("/api/coach/clients/:clientId", authenticateToken, async (req: any, res) => {
+    try {
+      if (req.user.role !== 'coach') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { clientId } = req.params;
+      const result = insertClientSchema.partial().safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ 
+          message: fromZodError(result.error).message 
+        });
+      }
+
+      const client = await storage.updateClient(clientId, result.data);
+      res.json(client);
+    } catch (error) {
+      console.error('Update client error:', error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/coach/clients/:clientId", authenticateToken, async (req: any, res) => {
+    try {
+      if (req.user.role !== 'coach') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { clientId } = req.params;
+      await storage.deleteClient(clientId);
+      res.status(204).send();
+    } catch (error) {
+      console.error('Delete client error:', error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Workout CRUD routes
+  app.post("/api/coach/workouts", authenticateToken, async (req: any, res) => {
+    try {
+      if (req.user.role !== 'coach') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const result = insertWorkoutSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ 
+          message: fromZodError(result.error).message 
+        });
+      }
+
+      const workout = await storage.createWorkout({
+        ...result.data,
+        coachId: req.user.userId,
+      });
+      res.status(201).json(workout);
+    } catch (error) {
+      console.error('Create workout error:', error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/workouts/:workoutId/complete", authenticateToken, async (req: any, res) => {
+    try {
+      const { workoutId } = req.params;
+      const { duration, notes } = req.body;
+
+      const workout = await storage.completeWorkout(workoutId, duration, notes);
+      res.json(workout);
+    } catch (error) {
+      console.error('Complete workout error:', error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Progress tracking routes
+  app.post("/api/client/progress", authenticateToken, async (req: any, res) => {
+    try {
+      if (req.user.role !== 'client') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const client = await storage.getClientByUserId(req.user.userId);
+      if (!client) {
+        return res.status(404).json({ message: "Client profile not found" });
+      }
+
+      const result = insertProgressEntrySchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ 
+          message: fromZodError(result.error).message 
+        });
+      }
+
+      const progress = await storage.createProgressEntry({
+        ...result.data,
+        clientId: client.id,
+      });
+      res.status(201).json(progress);
+    } catch (error) {
+      console.error('Create progress error:', error);
       res.status(500).json({ message: "Internal server error" });
     }
   });
