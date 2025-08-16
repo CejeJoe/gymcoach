@@ -94,10 +94,12 @@ export default function ClientManagement({ user }: ClientManagementProps) {
         },
         body: JSON.stringify({
           userId: userData.user.id,
+          coachId: user.id,
           goals: data.goals ? { description: data.goals } : undefined,
           currentWeight: data.currentWeight || null,
           targetWeight: data.targetWeight || null,
           height: data.height || null,
+          isActive: true,
         }),
       });
       

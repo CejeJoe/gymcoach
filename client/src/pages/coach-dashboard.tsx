@@ -254,6 +254,44 @@ export default function CoachDashboard({ user, onLogout }: CoachDashboardProps) 
           </div>
         </TabsContent>
       </Tabs>
+      
+      {/* Bottom Navigation */}
+      <nav className="glass-morphism fixed bottom-0 left-0 right-0 p-4 border-t border-white/10">
+        <div className="flex justify-around">
+          <button 
+            className={`flex flex-col items-center space-y-1 ${activeTab === 'overview' ? 'text-thrst-green' : 'text-muted-foreground'}`}
+            onClick={() => setActiveTab('overview')}
+            data-testid="nav-overview"
+          >
+            <TrendingUp className="h-5 w-5" />
+            <span className="text-xs">Overview</span>
+          </button>
+          <button 
+            className={`flex flex-col items-center space-y-1 ${activeTab === 'clients' ? 'text-thrst-green' : 'text-muted-foreground'}`}
+            onClick={() => setActiveTab('clients')}
+            data-testid="nav-clients"
+          >
+            <Users className="h-5 w-5" />
+            <span className="text-xs">Clients</span>
+          </button>
+          <button 
+            className={`flex flex-col items-center space-y-1 ${activeTab === 'workouts' ? 'text-thrst-green' : 'text-muted-foreground'}`}
+            onClick={() => setActiveTab('workouts')}
+            data-testid="nav-workouts"
+          >
+            <Dumbbell className="h-5 w-5" />
+            <span className="text-xs">Workouts</span>
+          </button>
+          <button 
+            className={`flex flex-col items-center space-y-1 ${activeTab === 'analytics' ? 'text-thrst-green' : 'text-muted-foreground'}`}
+            onClick={() => setActiveTab('analytics')}
+            data-testid="nav-analytics"
+          >
+            <BarChart3 className="h-5 w-5" />
+            <span className="text-xs">Analytics</span>
+          </button>
+        </div>
+      </nav>
     </div>
   );
 }

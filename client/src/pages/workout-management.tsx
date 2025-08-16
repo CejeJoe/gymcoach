@@ -87,8 +87,10 @@ export default function WorkoutManagement({ user }: WorkoutManagementProps) {
           name: data.name,
           description: data.description,
           clientId: data.clientId,
+          coachId: user.id,
           scheduledDate: data.scheduledDate ? new Date(data.scheduledDate).toISOString() : null,
-          exercises: data.exercises,
+          exercises: exercises.filter(ex => ex.name.trim() !== ''),
+          isCompleted: false,
         }),
       });
       
