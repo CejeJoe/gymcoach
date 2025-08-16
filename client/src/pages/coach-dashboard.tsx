@@ -219,7 +219,11 @@ export default function CoachDashboard({ user, onLogout }: CoachDashboardProps) 
                       <p className="text-xs text-muted-foreground">Next: Chest & Back</p>
                     </div>
                   </div>
-                  <Button size="sm" className="bg-thrst-green/20 hover:bg-thrst-green/30 text-thrst-green">
+                  <Button 
+                    size="sm" 
+                    className="bg-thrst-green/20 hover:bg-thrst-green/30 text-thrst-green"
+                    onClick={() => setActiveTab('workouts')}
+                  >
                     Start
                   </Button>
                 </div>
@@ -238,26 +242,131 @@ export default function CoachDashboard({ user, onLogout }: CoachDashboardProps) 
           <WorkoutManagement user={user} />
         </TabsContent>
 
-        <TabsContent value="analytics" className="p-4">
-          <div className="text-center py-12">
-            <BarChart3 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Analytics Coming Soon</h3>
-            <p className="text-muted-foreground">Detailed progress reports and insights</p>
+        <TabsContent value="analytics" className="p-4 space-y-6">
+          <div>
+            <h2 className="text-xl font-bold mb-4">Analytics Dashboard</h2>
           </div>
+
+          {/* Key Metrics */}
+          <div className="grid grid-cols-2 gap-4">
+            <GlassCard className="p-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-thrst-green/20 rounded-lg flex items-center justify-center">
+                  <TrendingUp className="h-5 w-5 text-thrst-green" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Client Growth</p>
+                  <p className="text-xl font-bold">+{stats?.totalClients || 0}</p>
+                </div>
+              </div>
+            </GlassCard>
+
+            <GlassCard className="p-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                  <Target className="h-5 w-5 text-blue-500" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Success Rate</p>
+                  <p className="text-xl font-bold">{stats?.avgProgress || 0}%</p>
+                </div>
+              </div>
+            </GlassCard>
+          </div>
+
+          {/* Progress Chart */}
+          <GlassCard className="p-6">
+            <h3 className="font-semibold mb-4">Monthly Progress</h3>
+            <div className="h-48 flex items-center justify-center border-2 border-dashed border-gray-300 rounded-lg">
+              <div className="text-center">
+                <BarChart3 className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                <p className="text-muted-foreground">Chart visualization</p>
+                <div className="mt-4 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Jan</span><span>8 clients</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Feb</span><span>12 clients</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Mar</span><span>{stats?.totalClients || 15} clients</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </GlassCard>
+
+          {/* Recent Activity */}
+          <GlassCard className="p-4">
+            <h3 className="font-semibold mb-4">Recent Activity</h3>
+            <div className="space-y-3">
+              <div className="flex items-center space-x-3">
+                <Dumbbell className="h-4 w-4 text-thrst-green" />
+                <span className="text-sm">New workout created</span>
+                <span className="text-xs text-muted-foreground ml-auto">2h ago</span>
+              </div>
+              <div className="flex items-center space-x-3">
+                <Users className="h-4 w-4 text-blue-500" />
+                <span className="text-sm">Client progress updated</span>
+                <span className="text-xs text-muted-foreground ml-auto">5h ago</span>
+              </div>
+              <div className="flex items-center space-x-3">
+                <Target className="h-4 w-4 text-purple-500" />
+                <span className="text-sm">Goal milestone reached</span>
+                <span className="text-xs text-muted-foreground ml-auto">1d ago</span>
+              </div>
+            </div>
+          </GlassCard>
         </TabsContent>
 
-        <TabsContent value="settings" className="p-4">
-          <div className="text-center py-12">
-            <Settings className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Settings</h3>
-            <p className="text-muted-foreground">Manage your account and preferences</p>
+        <TabsContent value="settings" className="p-4 space-y-6">
+          <div>
+            <h2 className="text-xl font-bold mb-4">Settings</h2>
           </div>
+
+          <GlassCard className="p-4">
+            <h3 className="font-semibold mb-4">Account Information</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium">Name</label>
+                <p className="text-sm text-muted-foreground">{user.firstName} {user.lastName}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Email</label>
+                <p className="text-sm text-muted-foreground">{user.email}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Role</label>
+                <p className="text-sm text-muted-foreground">Coach</p>
+              </div>
+            </div>
+          </GlassCard>
+
+          <GlassCard className="p-4">
+            <h3 className="font-semibold mb-4">Preferences</h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Dark Mode</span>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={toggleTheme}
+                >
+                  {theme === 'dark' ? 'Light' : 'Dark'}
+                </Button>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Notifications</span>
+                <Badge variant="secondary">Enabled</Badge>
+              </div>
+            </div>
+          </GlassCard>
         </TabsContent>
       </Tabs>
       
       {/* Bottom Navigation */}
-      <nav className="glass-morphism fixed bottom-0 left-0 right-0 p-4 border-t border-white/10">
-        <div className="flex justify-around">
+      <nav className="glass-morphism fixed bottom-0 left-0 right-0 p-2 border-t border-white/10">
+        <div className="flex justify-around max-w-md mx-auto">
           <button 
             className={`flex flex-col items-center space-y-1 ${activeTab === 'overview' ? 'text-thrst-green' : 'text-muted-foreground'}`}
             onClick={() => setActiveTab('overview')}

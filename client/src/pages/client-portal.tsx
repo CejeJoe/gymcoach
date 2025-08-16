@@ -102,9 +102,11 @@ export default function ClientPortal({ user, onLogout }: ClientPortalProps) {
         </div>
       </header>
 
-      <div className="p-4 space-y-6">
-        {/* Quick Stats */}
-        <div className="grid grid-cols-3 gap-3">
+      {/* Tab Content */}
+      {activeTab === "home" && (
+        <div className="p-4 space-y-6">
+          {/* Quick Stats */}
+          <div className="grid grid-cols-3 gap-3">
           <GlassCard className="p-3 text-center">
             <div className="text-lg font-bold text-thrst-green">
               {stats?.totalWorkouts || 0}
@@ -121,7 +123,7 @@ export default function ClientPortal({ user, onLogout }: ClientPortalProps) {
 
           <GlassCard className="p-3 text-center">
             <div className="text-lg font-bold text-purple-400">
-              {stats?.streak || 0}
+              {7}
             </div>
             <div className="text-xs text-muted-foreground">Day Streak</div>
           </GlassCard>
@@ -208,11 +210,81 @@ export default function ClientPortal({ user, onLogout }: ClientPortalProps) {
             </div>
           </div>
         </GlassCard>
-      </div>
+        </div>
+      )}
+
+      {activeTab === "workouts" && (
+        <div className="p-4">
+          <h2 className="text-xl font-bold mb-4">My Workouts</h2>
+          {workouts && workouts.length > 0 ? (
+            <div className="space-y-4">
+              {workouts.map((workout) => (
+                <GlassCard key={workout.id} className="p-4">
+                  <h3 className="font-semibold">{workout.name}</h3>
+                  <p className="text-sm text-muted-foreground">{workout.description}</p>
+                  <div className="mt-2 flex justify-between items-center">
+                    <Badge variant={workout.completedAt ? "default" : "secondary"}>
+                      {workout.completedAt ? "Completed" : "Pending"}
+                    </Badge>
+                    <Button size="sm">View Details</Button>
+                  </div>
+                </GlassCard>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <Dumbbell className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No Workouts Yet</h3>
+              <p className="text-muted-foreground">Your coach will assign workouts soon</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === "progress" && (
+        <div className="p-4">
+          <h2 className="text-xl font-bold mb-4">Progress Tracking</h2>
+          <div className="space-y-4">
+            <GlassCard className="p-4">
+              <h3 className="font-semibold mb-2">Weight Progress</h3>
+              <div className="h-32 flex items-center justify-center border-2 border-dashed border-gray-300 rounded-lg">
+                <p className="text-muted-foreground">Chart coming soon</p>
+              </div>
+            </GlassCard>
+            <GlassCard className="p-4">
+              <h3 className="font-semibold mb-2">Workout Streak</h3>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-thrst-green">{7}</div>
+                <p className="text-sm text-muted-foreground">Days in a row</p>
+              </div>
+            </GlassCard>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "profile" && (
+        <div className="p-4">
+          <h2 className="text-xl font-bold mb-4">Profile Settings</h2>
+          <div className="space-y-4">
+            <GlassCard className="p-4">
+              <h3 className="font-semibold mb-2">Personal Information</h3>
+              <div className="space-y-2">
+                <p><span className="font-medium">Name:</span> {user.firstName} {user.lastName}</p>
+                <p><span className="font-medium">Email:</span> {user.email}</p>
+                <p><span className="font-medium">Role:</span> Client</p>
+              </div>
+            </GlassCard>
+            <GlassCard className="p-4">
+              <h3 className="font-semibold mb-2">Fitness Goals</h3>
+              <p className="text-muted-foreground">Goal tracking coming soon</p>
+            </GlassCard>
+          </div>
+        </div>
+      )}
 
       {/* Bottom Navigation */}
-      <nav className="glass-morphism fixed bottom-0 left-0 right-0 p-4 border-t border-white/10">
-        <div className="flex justify-around">
+      <nav className="glass-morphism fixed bottom-0 left-0 right-0 p-2 border-t border-white/10">
+        <div className="flex justify-around max-w-md mx-auto">
           <button 
             className={`flex flex-col items-center space-y-1 ${activeTab === 'home' ? 'text-thrst-green' : 'text-muted-foreground'}`}
             onClick={() => setActiveTab('home')}
