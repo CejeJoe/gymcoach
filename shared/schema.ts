@@ -36,7 +36,7 @@ export const workouts = pgTable("workouts", {
   coachId: varchar("coach_id").notNull().references(() => users.id),
   name: text("name").notNull(),
   description: text("description"),
-  exercises: jsonb("exercises").notNull(),
+  exercises: jsonb("exercises").default([]),
   scheduledDate: timestamp("scheduled_date"),
   completedAt: timestamp("completed_at"),
   duration: integer("duration"), // in minutes

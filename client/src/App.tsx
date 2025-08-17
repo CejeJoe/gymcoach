@@ -19,8 +19,14 @@ function Router() {
   useEffect(() => {
     // Check if user is already authenticated
     const storedUser = authStorage.getUser();
-    if (storedUser && authStorage.isAuthenticated()) {
+    const token = authStorage.getToken();
+    
+    // Validate token format (basic check)
+    if (storedUser && token && token.split('.').length === 3) {
       setUser(storedUser);
+    } else {
+      // Clear corrupted auth data
+      authStorage.clear();
     }
     setIsLoading(false);
   }, []);
