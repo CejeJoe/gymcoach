@@ -5,7 +5,8 @@ const USER_KEY = 'thrst_user';
 
 export const authStorage = {
   getToken: (): string | null => {
-    return localStorage.getItem(TOKEN_KEY);
+    // Prefer new key, but fall back to legacy 'token' if present
+    return localStorage.getItem(TOKEN_KEY) || localStorage.getItem('token');
   },
   
   setToken: (token: string): void => {

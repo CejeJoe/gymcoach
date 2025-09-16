@@ -17,6 +17,8 @@ export interface CoachStats {
   activeClients: number;
   completedWorkouts: number;
   avgProgress: number;
+  recentWorkouts?: any[];
+  upcomingWorkouts?: any[];
 }
 
 export interface ClientStats {
@@ -27,10 +29,10 @@ export interface ClientStats {
 }
 
 export interface Exercise {
-  id: string;
+  id?: string;
   name: string;
   sets: number;
-  reps: number;
+  reps: number | null;
   weight?: number;
   duration?: number;
   completed?: boolean;
@@ -38,6 +40,8 @@ export interface Exercise {
 
 export interface WorkoutData {
   id: string;
+  clientId: string;
+  coachId: string;
   name: string;
   description?: string;
   exercises: Exercise[];
@@ -45,6 +49,8 @@ export interface WorkoutData {
   completedAt?: string;
   duration?: number;
   notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ProgressData {
@@ -69,4 +75,28 @@ export interface ClientData {
   startDate: string;
   isActive: boolean;
   user?: AuthUser;
+}
+
+// Messaging
+export interface Message {
+  id: string;
+  coachId: string;
+  clientId: string;
+  senderId: string;
+  body: string;
+  createdAt: string;
+  readAt: string | null;
+  // Optional broadcast-linked fields (present if this message came from a group broadcast)
+  groupMessageId?: string;
+  groupMessageTitle?: string | null;
+  requiresConfirmation?: boolean;
+  confirmedAt?: string | null;
+  workoutId?: string | null;
+  workoutName?: string | null;
+}
+
+export interface NewMessage {
+  coachId: string;
+  clientId: string;
+  body: string;
 }

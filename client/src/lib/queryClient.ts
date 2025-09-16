@@ -18,13 +18,21 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
+  // For GET requests to API endpoints, append a cache-busting query param
+  let requestUrl = url;
+  if (method.toUpperCase() === 'GET' && /^\/?api\//.test(url.replace(/^\//, ''))) {
+    const sep = url.includes('?') ? '&' : '?';
+    requestUrl = `${url}${sep}_ts=${Date.now()}`;
+  }
+  const res = await fetch(requestUrl, {
     method,
     headers: {
       "Content-Type": "application/json",
       ...getAuthHeaders(),
     },
     body: data ? JSON.stringify(data) : undefined,
+    // Ensure we always bypass browser cache on API calls
+    cache: 'no-store',
   });
 
   await throwIfResNotOk(res);
@@ -37,8 +45,16 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    // Build URL and add cache-busting for GETs
+    let qUrl = queryKey.join("/") as string;
+    if (/^\/?api\//.test(qUrl.replace(/^\//, ''))) {
+      const sep = qUrl.includes('?') ? '&' : '?';
+      qUrl = `${qUrl}${sep}_ts=${Date.now()}`;
+    }
+    const res = await fetch(qUrl, {
       headers: getAuthHeaders(),
+      // Bypass cache for default queryFn as well
+      cache: 'no-store',
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
@@ -63,3 +79,20 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+// Upload a single file to /api/uploads using multipart/form-data
+export async function apiUploadFile(file: File): Promise<{ url: string; mime: string; size: number; originalName: string }>
+{
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch("/api/uploads", {
+    method: "POST",
+    headers: {
+      // DO NOT set Content-Type for multipart; browser will set boundary
+      ...getAuthHeaders(),
+    } as any,
+    body: form,
+  });
+  await (async () => { if (!res.ok) { const t = (await res.text()) || res.statusText; throw new Error(`${res.status}: ${t}`); } })();
+  return await res.json();
+}

@@ -58,6 +58,94 @@ export const progressEntries = pgTable("progress_entries", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Messaging and additional tracking tables (ported from MySQL schema)
+export const messages = pgTable("messages", {
+  id: varchar("id").primaryKey(),
+  coachId: varchar("coach_id").notNull(),
+  clientId: varchar("client_id").notNull(),
+  senderId: varchar("sender_id").notNull(),
+  body: text("body").notNull(),
+  groupMessageId: varchar("group_message_id"),
+  createdAt: timestamp("created_at").notNull(),
+  readAt: timestamp("read_at"),
+});
+
+export const groupMessages = pgTable("group_messages", {
+  id: varchar("id").primaryKey(),
+  coachId: varchar("coach_id").notNull(),
+  title: text("title"),
+  body: text("body").notNull(),
+  scheduledAt: timestamp("scheduled_at").notNull(),
+  requireConfirmation: boolean("require_confirmation").default(false),
+  audience: text("audience").notNull(),
+  workoutId: varchar("workout_id"),
+  status: varchar("status").notNull().default("scheduled"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const groupMessageRecipients = pgTable("group_message_recipients", {
+  id: varchar("id").primaryKey(),
+  messageId: varchar("message_id").notNull(),
+  clientId: varchar("client_id").notNull(),
+  sentAt: timestamp("sent_at"),
+  confirmedAt: timestamp("confirmed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const sessionLogs = pgTable("session_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull(),
+  coachId: varchar("coach_id").notNull(),
+  workoutId: varchar("workout_id"),
+  performed: jsonb("performed"),
+  date: timestamp("date").defaultNow(),
+  duration: integer("duration"),
+  averageRpe: decimal("average_rpe", { precision: 3, scale: 1 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const bodyMeasurements = pgTable("body_measurements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull(),
+  date: timestamp("date").defaultNow(),
+  weight: decimal("weight", { precision: 5, scale: 2 }),
+  bodyFat: decimal("body_fat", { precision: 4, scale: 2 }),
+  muscleMass: decimal("muscle_mass", { precision: 5, scale: 2 }),
+  measurements: jsonb("measurements"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const workoutSessions = pgTable("workout_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  coachId: varchar("coach_id"),
+  startTime: timestamp("start_time").notNull(),
+  endTime: timestamp("end_time"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const workoutEntries = pgTable("workout_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id"),
+  userId: varchar("user_id").notNull(),
+  coachId: varchar("coach_id"),
+  exercise: text("exercise").notNull(),
+  sets: integer("sets"),
+  reps: integer("reps"),
+  weight: decimal("weight", { precision: 6, scale: 2 }),
+  duration: integer("duration"),
+  rawText: text("raw_text").notNull(),
+  timestamp: timestamp("timestamp").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   clientProfiles: many(clients, { relationName: "userToClient" }),
@@ -105,10 +193,23 @@ export const insertUserSchema = createInsertSchema(users).omit({
   updatedAt: true,
 });
 
-export const insertClientSchema = createInsertSchema(clients).omit({
+export const insertClientSchema = createInsertSchema(clients, {
+  // Accept decimals as string or number from the client
+  currentWeight: z.union([z.string(), z.number()]).nullable(),
+  targetWeight: z.union([z.string(), z.number()]).nullable(),
+  height: z.union([z.string(), z.number()]).nullable(),
+}).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  // These are set by the server
+  userId: true,
+  coachId: true,
+  startDate: true,
+}).extend({
+  email: z.string().email(),
+  firstName: z.string().min(1, 'First name is required'),
+  lastName: z.string().min(1, 'Last name is required'),
 });
 
 export const insertWorkoutSchema = createInsertSchema(workouts).omit({
@@ -127,6 +228,13 @@ export const loginSchema = z.object({
   password: z.string().min(6),
 });
 
+// Insert schemas for new tables
+export const insertMessageSchema = createInsertSchema(messages);
+export const insertGroupMessageSchema = createInsertSchema(groupMessages);
+export const insertGroupMessageRecipientSchema = createInsertSchema(groupMessageRecipients);
+export const insertSessionLogSchema = createInsertSchema(sessionLogs);
+export const insertBodyMeasurementSchema = createInsertSchema(bodyMeasurements);
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -136,4 +244,14 @@ export type Workout = typeof workouts.$inferSelect;
 export type InsertWorkout = z.infer<typeof insertWorkoutSchema>;
 export type ProgressEntry = typeof progressEntries.$inferSelect;
 export type InsertProgressEntry = z.infer<typeof insertProgressEntrySchema>;
+export type Message = typeof messages.$inferSelect;
+export type InsertMessage = typeof messages.$inferInsert;
+export type SessionLog = typeof sessionLogs.$inferSelect;
+export type InsertSessionLog = typeof sessionLogs.$inferInsert;
+export type BodyMeasurement = typeof bodyMeasurements.$inferSelect;
+export type InsertBodyMeasurement = typeof bodyMeasurements.$inferInsert;
+export type GroupMessage = typeof groupMessages.$inferSelect;
+export type InsertGroupMessage = typeof groupMessages.$inferInsert;
+export type GroupMessageRecipient = typeof groupMessageRecipients.$inferSelect;
+export type InsertGroupMessageRecipient = typeof groupMessageRecipients.$inferInsert;
 export type LoginRequest = z.infer<typeof loginSchema>;

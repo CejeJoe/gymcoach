@@ -4,3 +4,16 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+.env
+.local/
+node_modules/
+dist/
+uploads/
+gymcoach.db
+dist.zip
+distold.zip
+distoldnew.zip
+zScreenshot,test app/
+debug-*.js
+sample-clients.txt

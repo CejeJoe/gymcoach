@@ -47,7 +47,7 @@ export function ProgressRing({
           r={normalizedRadius}
           cx={size / 2}
           cy={size / 2}
-          className="text-thrst-green progress-ring-circle"
+          className="text-thrst-accent progress-ring-circle"
         />
       </svg>
       

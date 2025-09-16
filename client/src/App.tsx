@@ -10,7 +10,11 @@ import { AuthUser } from "@/lib/types";
 import LoginPage from "@/pages/login";
 import CoachDashboard from "@/pages/coach-dashboard";
 import ClientPortal from "@/pages/client-portal";
+import WorkoutSummary from "@/pages/workout-summary";
+import WorkoutLogging from "@/pages/workout-logging";
+import WorkoutDashboard from "@/pages/workout-dashboard";
 import NotFound from "@/pages/not-found";
+import ShareEmbed from "@/pages/share";
 
 function Router() {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -48,14 +52,45 @@ function Router() {
     );
   }
 
-  if (!user) {
-    return <LoginPage onLogin={handleLogin} />;
-  }
-
   return (
     <Switch>
+      {/* Public, unauthenticated share route */}
+      <Route path="/share">
+        <ShareEmbed />
+      </Route>
+
+      {/* Workout logging route - requires authentication */}
+      <Route path="/workout-logging">
+        {!user ? (
+          <LoginPage onLogin={handleLogin} />
+        ) : (
+          <WorkoutLogging user={user} />
+        )}
+      </Route>
+
+      {/* Workout summary route - requires authentication */}
+      <Route path="/workout-summary">
+        {!user ? (
+          <LoginPage onLogin={handleLogin} />
+        ) : (
+          <WorkoutSummary user={user} />
+        )}
+      </Route>
+
+      {/* Workout dashboard route - requires authentication */}
+      <Route path="/workout-dashboard">
+        {!user ? (
+          <LoginPage onLogin={handleLogin} />
+        ) : (
+          <WorkoutDashboard user={user} />
+        )}
+      </Route>
+
+      {/* Auth-gated app routes */}
       <Route path="/">
-        {user.role === 'coach' ? (
+        {!user ? (
+          <LoginPage onLogin={handleLogin} />
+        ) : user.role === 'coach' ? (
           <CoachDashboard user={user} onLogout={handleLogout} />
         ) : (
           <ClientPortal user={user} onLogout={handleLogout} />
