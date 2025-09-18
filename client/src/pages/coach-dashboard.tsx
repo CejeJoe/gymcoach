@@ -9,12 +9,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GlassCard } from "@/components/ui/glass-card";
 import { ProgressRing } from "@/components/ui/progress-ring";
 import { useTheme } from "@/components/ui/theme-provider";
-import { getAuthHeaders } from "@/lib/auth";
+import { getAuthHeaders, authStorage } from "@/lib/auth";
 import { CoachStats, ClientData, AuthUser } from "@/lib/types";
 import ClientManagement from "./client-management";
 import ChatThread from "@/components/chat-thread";
 import { useMessageThread } from "@/hooks/use-messages";
 import { DashboardCustomization } from '../components/ui/dashboard-customization';
+import type { DashboardPreferences } from '../components/ui/dashboard-customization';
 import { ClientFeedbackPanel } from '../components/ui/client-feedback-panel';
 import { ReportsDashboard } from '../components/ui/simple-reports-dashboard';
 import WorkoutManagement from "./workout-management";
@@ -34,11 +35,88 @@ import {
   Target,
   Clock,
   BarChart3,
+  Megaphone,
+  ArrowRight,
+  Download,
   Settings,
   AlertCircle,
   AlertTriangle,
   RefreshCw
 } from "lucide-react";
+
+// Simple inline profile edit form for Settings tab
+function EditProfileForm({ initial }: { initial: { firstName: string; lastName: string; email: string } }) {
+  const [firstName, setFirstName] = useState(initial.firstName || "");
+  const [lastName, setLastName] = useState(initial.lastName || "");
+  const [email, setEmail] = useState(initial.email || "");
+  const [saving, setSaving] = useState(false);
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const res = await fetch('/api/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({ firstName, lastName, email })
+      });
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(t || 'Failed to update profile');
+      }
+      const updated = await res.json();
+      // Persist updated user to auth storage and refresh
+      const user = authStorage.getUser();
+      authStorage.setUser({ ...(user || {}), ...updated });
+      toast.success('Profile updated');
+      setTimeout(() => window.location.reload(), 500);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to update profile');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="text-sm font-medium">First Name</label>
+          <input
+            className="mt-1 w-full bg-background border border-white/10 rounded px-3 py-2 text-sm"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            required
+          />
+        </div>
+        <div>
+          <label className="text-sm font-medium">Last Name</label>
+          <input
+            className="mt-1 w-full bg-background border border-white/10 rounded px-3 py-2 text-sm"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            required
+          />
+        </div>
+      </div>
+      <div>
+        <label className="text-sm font-medium">Email</label>
+        <input
+          type="email"
+          className="mt-1 w-full bg-background border border-white/10 rounded px-3 py-2 text-sm"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+      </div>
+      <div className="flex justify-end">
+        <Button type="submit" disabled={saving} className="rounded-xl">
+          {saving ? 'Saving...' : 'Save Changes'}
+        </Button>
+      </div>
+    </form>
+  );
+}
 
 type ApiError = {
   message: string;
@@ -67,6 +145,10 @@ export default function CoachDashboard({ user, onLogout }: CoachDashboardProps) 
   const [isLogOpen, setIsLogOpen] = useState(false);
   const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
   const isMobile = useMediaQuery("(max-width: 768px)");
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  // PWA install support
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [canInstall, setCanInstall] = useState(false);
   
   // Dashboard customization state
   const [dashboardPreferences, setDashboardPreferences] = useState<DashboardPreferences>({
@@ -78,12 +160,23 @@ export default function CoachDashboard({ user, onLogout }: CoachDashboardProps) 
       { id: 'progress-charts', title: 'Progress Charts', component: 'ProgressCharts', enabled: true, order: 4, size: 'large' },
       { id: 'client-messages', title: 'Recent Messages', component: 'ClientMessages', enabled: true, order: 5, size: 'medium' },
     ],
-    showClientFeedback: true,
+    showClientFeedback: false,
     feedbackPosition: 'top',
     autoRefresh: true,
     refreshInterval: 30,
     theme: 'default'
   });
+
+  // Capture PWA beforeinstallprompt
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setCanInstall(true);
+    };
+    window.addEventListener('beforeinstallprompt', handler as any);
+    return () => window.removeEventListener('beforeinstallprompt', handler as any);
+  }, []);
 
   // Load preferences from localStorage
   useEffect(() => {
@@ -286,9 +379,7 @@ export default function CoachDashboard({ user, onLogout }: CoachDashboardProps) 
     }
   }, [queryClient, todayRange.start, todayRange.end]);
 
-  if (statsLoading || clientsLoading) {
-    return <DashboardSkeleton />;
-  }
+  // Do not early-return; keep header visible and render skeletons below when loading
 
   // Check for empty states
   const hasClients = clients && clients.length > 0;
@@ -302,73 +393,81 @@ export default function CoachDashboard({ user, onLogout }: CoachDashboardProps) 
     <div className="min-h-screen bg-background pb-20">
       {/* Header */}
       <header className="glass-morphism sticky top-0 z-40 p-3 sm:p-4 border-b border-white/10">
-        <div className="flex flex-col space-y-3 md:space-y-0 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center justify-between w-full md:w-auto">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center min-w-0 gap-3">
             <div className="min-w-0">
               <h1 className="font-bold text-base sm:text-lg truncate">Coach Dashboard</h1>
               <p className="text-xs text-muted-foreground truncate">
                 Welcome back, <span className="font-medium" data-testid="user-firstname">{user.firstName}</span>
               </p>
             </div>
-            {isMobile && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleTheme}
-                className="glass-morphism rounded-xl md:hidden"
-                aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              >
-                {theme === 'dark' ? (
-                  <Sun className="h-4 w-4" />
-                ) : (
-                  <Moon className="h-4 w-4" />
-                )}
-              </Button>
-            )}
           </div>
           
-          <div className="flex items-center space-x-2 md:space-x-3">
-            <DashboardCustomization 
-              preferences={dashboardPreferences}
-              onPreferencesChange={handlePreferencesChange}
-            />
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+            {/* Mobile-only Reports chip */}
             <Button
               variant="ghost"
-              size={isMobile ? "sm" : "default"}
+              size="icon"
+              className="rounded-xl md:hidden"
+              title="Reports"
+              aria-label="Reports"
+              onClick={() => setActiveTab('reports')}
+            >
+              <BarChart3 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={refreshData}
               disabled={isRefreshing}
               className="glass-morphism rounded-xl flex items-center gap-2 transition-all duration-200 hover:bg-opacity-80"
               aria-label={isRefreshing ? 'Refreshing...' : 'Refresh data'}
             >
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-              {!isMobile && <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>}
+              <span className="hidden sm:inline">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
             </Button>
-            {!isMobile && (
+            {canInstall && (
               <Button
                 variant="ghost"
-                size="icon"
-                onClick={toggleTheme}
-                className="glass-morphism rounded-xl hidden md:flex"
-                data-testid="button-theme-toggle"
-                aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                size="sm"
+                onClick={async () => {
+                  try {
+                    await deferredPrompt.prompt();
+                    await deferredPrompt.userChoice;
+                  } finally {
+                    setCanInstall(false);
+                    setDeferredPrompt(null);
+                  }
+                }}
+                className="glass-morphism rounded-xl"
               >
-                {theme === 'dark' ? (
-                  <Sun className="h-4 w-4" />
-                ) : (
-                  <Moon className="h-4 w-4" />
-                )}
+                Install
               </Button>
             )}
             <Button
               variant="ghost"
-              size={isMobile ? "sm" : "default"}
+              size="icon"
+              onClick={toggleTheme}
+              className="glass-morphism rounded-xl"
+              data-testid="button-theme-toggle"
+              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {theme === 'dark' ? (
+                <Sun className="h-4 w-4" />
+              ) : (
+                <Moon className="h-4 w-4" />
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={onLogout}
               className="bg-thrst-accent/20 rounded-xl hover:bg-thrst-accent/30 flex items-center gap-2"
               data-testid="button-logout"
               aria-label="Log out"
             >
               <LogOut className="h-4 w-4 text-thrst-accent" />
-              {!isMobile && <span>Logout</span>}
+              <span className="hidden sm:inline">Logout</span>
             </Button>
           </div>
         </div>
@@ -521,14 +620,96 @@ export default function CoachDashboard({ user, onLogout }: CoachDashboardProps) 
           id="overview-tabpanel"
           aria-labelledby="overview-tab"
         >
-          {/* Client Feedback Panel - Prominent Display */}
-          {dashboardPreferences.showClientFeedback && dashboardPreferences.feedbackPosition === 'top' && (
-            <div className="mb-6">
-              <ClientFeedbackPanel 
-                position="top" 
-                isProminent={true}
-                maxHeight="300px"
-              />
+          {/* Compact toolbar: minimal icon actions (no Add Client) */}
+          <div className="flex items-center gap-2 mb-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-xl"
+              title="Create Workout"
+              onClick={() => setActiveTab('workouts')}
+            >
+              <Dumbbell className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-xl"
+              title="Broadcast"
+              onClick={() => setIsBroadcastOpen(true)}
+            >
+              <Megaphone className="h-4 w-4" />
+            </Button>
+            <div className="flex-1" />
+            {/* Inline Install App callout */}
+            {canInstall && (
+              <div className="text-xs text-muted-foreground flex items-center gap-2">
+                <span>Install app for faster access</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-2 py-0 rounded-xl"
+                  onClick={async () => {
+                    try {
+                      await deferredPrompt?.prompt();
+                      await deferredPrompt?.userChoice;
+                    } finally {
+                      setCanInstall(false);
+                      setDeferredPrompt(null);
+                    }
+                  }}
+                >
+                  Install
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Small Reports teaser (tap to open Reports tab) */}
+          <GlassCard className="p-3 mb-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-yellow-400" />
+                <div className="text-sm font-medium">Reports</div>
+              </div>
+              <Button size="icon" variant="ghost" className="rounded-xl h-7 w-7" onClick={() => setActiveTab('reports')} aria-label="Go to reports">
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="mt-2 grid grid-cols-3 gap-2 text-center">
+              <div>
+                {statsLoading ? <Skeleton className="h-4 w-10 mx-auto" /> : <div className="text-sm font-semibold">{stats?.totalClients ?? 0}</div>}
+                <div className="text-[10px] text-muted-foreground">Clients</div>
+              </div>
+              <div>
+                {statsLoading ? <Skeleton className="h-4 w-10 mx-auto" /> : <div className="text-sm font-semibold">{stats?.completedWorkouts ?? 0}</div>}
+                <div className="text-[10px] text-muted-foreground">Workouts</div>
+              </div>
+              <div>
+                {statsLoading ? <Skeleton className="h-4 w-10 mx-auto" /> : <div className="text-sm font-semibold">{stats?.avgProgress ?? 0}%</div>}
+                <div className="text-[10px] text-muted-foreground">Progress</div>
+              </div>
+            </div>
+          </GlassCard>
+
+          {/* Install App chip at bottom of Overview */}
+          {canInstall && (
+            <div className="flex justify-center">
+              <Button
+                variant="outline"
+                className="rounded-full h-8 px-3 text-xs"
+                onClick={async () => {
+                  try {
+                    await deferredPrompt?.prompt();
+                    await deferredPrompt?.userChoice;
+                  } finally {
+                    setCanInstall(false);
+                    setDeferredPrompt(null);
+                  }
+                }}
+              >
+                <Download className="h-4 w-4 mr-1" /> Install App
+              </Button>
             </div>
           )}
 
@@ -536,6 +717,9 @@ export default function CoachDashboard({ user, onLogout }: CoachDashboardProps) 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <GlassCard className="p-4">
               <div className="flex items-center gap-4">
+                {statsLoading ? (
+                  <div className="w-full"><Skeleton className="h-24 w-full rounded-xl" /></div>
+                ) : (
                 <ProgressRing
                   progress={avgProgressPct}
                   size={120}
@@ -549,6 +733,7 @@ export default function CoachDashboard({ user, onLogout }: CoachDashboardProps) 
                     <div className="text-[11px] text-muted-foreground -mt-1">Health Score</div>
                   </div>
                 </ProgressRing>
+                )}
                 <div className="flex-1">
                   <h4 className="text-sm font-medium mb-1">Client Health</h4>
                   <p className="text-xs text-muted-foreground mb-2">Average progress across all clients</p>
@@ -562,6 +747,9 @@ export default function CoachDashboard({ user, onLogout }: CoachDashboardProps) 
 
             <GlassCard className="p-4">
               <div className="flex items-center gap-4">
+                {statsLoading ? (
+                  <div className="w-full"><Skeleton className="h-24 w-full rounded-xl" /></div>
+                ) : (
                 <ProgressRing
                   progress={activeRatioPct}
                   size={120}
@@ -575,6 +763,7 @@ export default function CoachDashboard({ user, onLogout }: CoachDashboardProps) 
                     <div className="text-[11px] text-muted-foreground -mt-1">Active Clients</div>
                   </div>
                 </ProgressRing>
+                )}
                 <div className="flex-1">
                   <h4 className="text-sm font-medium mb-1">Engagement</h4>
                   <p className="text-xs text-muted-foreground mb-2">{stats?.activeClients || 0} of {stats?.totalClients || 0} clients active</p>
@@ -593,36 +782,44 @@ export default function CoachDashboard({ user, onLogout }: CoachDashboardProps) 
           <div className="grid grid-cols-4 gap-2">
             <GlassCard className="p-3">
               <div className="text-center">
-                <div className="text-lg font-bold text-yellow-400" data-testid="text-total-clients">
-                  {stats?.totalClients || 0}
-                </div>
+                {statsLoading ? <Skeleton className="h-6 w-10 mx-auto" /> : (
+                  <div className="text-lg font-bold text-yellow-400" data-testid="text-total-clients">
+                    {stats?.totalClients || 0}
+                  </div>
+                )}
                 <div className="text-xs text-muted-foreground">Clients</div>
               </div>
             </GlassCard>
             
             <GlassCard className="p-3">
               <div className="text-center">
-                <div className="text-lg font-bold text-yellow-400" data-testid="text-avg-progress">
-                  {stats?.avgProgress || 0}%
-                </div>
+                {statsLoading ? <Skeleton className="h-6 w-10 mx-auto" /> : (
+                  <div className="text-lg font-bold text-yellow-400" data-testid="text-avg-progress">
+                    {stats?.avgProgress || 0}%
+                  </div>
+                )}
                 <div className="text-xs text-muted-foreground">Progress</div>
               </div>
             </GlassCard>
 
             <GlassCard className="p-3">
               <div className="text-center">
-                <div className="text-lg font-bold text-blue-400" data-testid="text-completed-workouts">
-                  {stats?.completedWorkouts || 0}
-                </div>
+                {statsLoading ? <Skeleton className="h-6 w-10 mx-auto" /> : (
+                  <div className="text-lg font-bold text-blue-400" data-testid="text-completed-workouts">
+                    {stats?.completedWorkouts || 0}
+                  </div>
+                )}
                 <div className="text-xs text-muted-foreground">Workouts</div>
               </div>
             </GlassCard>
 
             <GlassCard className="p-3">
               <div className="text-center">
-                <div className="text-lg font-bold text-purple-400" data-testid="text-active-clients">
-                  {stats?.activeClients || 0}
-                </div>
+                {statsLoading ? <Skeleton className="h-6 w-10 mx-auto" /> : (
+                  <div className="text-lg font-bold text-purple-400" data-testid="text-active-clients">
+                    {stats?.activeClients || 0}
+                  </div>
+                )}
                 <div className="text-xs text-muted-foreground">Active</div>
               </div>
             </GlassCard>
@@ -986,27 +1183,32 @@ export default function CoachDashboard({ user, onLogout }: CoachDashboardProps) 
                   <label className="text-sm font-medium">Role</label>
                   <p className="text-sm text-muted-foreground">Coach</p>
                 </div>
+                <div className="pt-2">
+                  {!showEditProfile ? (
+                    <Button size="sm" onClick={() => setShowEditProfile(true)} className="rounded-xl">Edit</Button>
+                  ) : (
+                    <Button size="sm" variant="outline" onClick={() => setShowEditProfile(false)} className="rounded-xl">Cancel</Button>
+                  )}
+                </div>
               </div>
             </GlassCard>
 
             <GlassCard className="p-4">
-              <h3 className="font-semibold mb-4">Preferences</h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Dark Mode</span>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={toggleTheme}
-                  >
-                    {theme === 'dark' ? 'Light' : 'Dark'}
-                  </Button>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Notifications</span>
-                  <Badge variant="secondary">Enabled</Badge>
-                </div>
-              </div>
+              <h3 className="font-semibold mb-4">Edit Profile</h3>
+              {showEditProfile ? (
+                <EditProfileForm initial={{ firstName: user.firstName, lastName: user.lastName, email: user.email }} />
+              ) : (
+                <p className="text-sm text-muted-foreground">Click Edit to update your profile details.</p>
+              )}
+            </GlassCard>
+
+            {/* Dashboard customization is moved here (works on mobile and desktop) */}
+            <GlassCard className="p-4 md:col-span-2">
+              <h3 className="font-semibold mb-4">Dashboard Customization</h3>
+              <DashboardCustomization 
+                preferences={dashboardPreferences}
+                onPreferencesChange={handlePreferencesChange}
+              />
             </GlassCard>
           </div>
         </TabsContent>

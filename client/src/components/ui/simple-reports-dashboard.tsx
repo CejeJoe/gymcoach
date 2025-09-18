@@ -149,7 +149,7 @@ export function ReportsDashboard({ coachId }: ReportsDashboardProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 overflow-x-hidden">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -179,8 +179,8 @@ export function ReportsDashboard({ coachId }: ReportsDashboardProps) {
         </div>
       </div>
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Key Metrics: 2 columns on mobile */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 w-full">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Clients</CardTitle>
@@ -244,11 +244,11 @@ export function ReportsDashboard({ coachId }: ReportsDashboardProps) {
 
       {/* Charts and Analytics */}
       <Tabs defaultValue="progress" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="progress">Client Progress</TabsTrigger>
-          <TabsTrigger value="trends">Workout Trends</TabsTrigger>
-          <TabsTrigger value="retention">Client Retention</TabsTrigger>
-          <TabsTrigger value="performance">Performance Analysis</TabsTrigger>
+        <TabsList className="w-full overflow-x-auto whitespace-nowrap">
+          <TabsTrigger className="shrink-0" value="progress">Client Progress</TabsTrigger>
+          <TabsTrigger className="shrink-0" value="trends">Workout Trends</TabsTrigger>
+          <TabsTrigger className="shrink-0" value="retention">Client Retention</TabsTrigger>
+          <TabsTrigger className="shrink-0" value="performance">Performance Analysis</TabsTrigger>
         </TabsList>
 
         <TabsContent value="progress" className="space-y-4">

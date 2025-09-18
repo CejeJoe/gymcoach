@@ -224,9 +224,9 @@ export default function ClientFeedbackPanel({
   const urgentCount = feedbacks.filter(f => f.priority === 'urgent' || f.priority === 'high').length;
 
   const containerClass = position === 'sidebar' 
-    ? 'w-full' 
-    : position === 'top' 
-    ? 'w-full' 
+    ? 'w-full'
+    : position === 'top'
+    ? 'w-full'
     : 'w-full';
 
   if (isLoading) {
@@ -240,9 +240,9 @@ export default function ClientFeedbackPanel({
   }
 
   return (
-    <Card className={`${containerClass} ${isProminent ? 'border-2 border-primary/20 shadow-lg' : ''}`}>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
+    <Card className={`${containerClass} ${isProminent ? 'border border-white/10 md:border-2 md:border-primary/20 shadow-lg' : 'border border-white/10'}`}>
+      <CardHeader className="pb-2 md:pb-3 px-3 md:px-4">
+        <div className="flex items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2">
             <MessageSquare className="h-5 w-5" />
             Client Feedback
@@ -252,7 +252,7 @@ export default function ClientFeedbackPanel({
               </Badge>
             )}
           </CardTitle>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 md:gap-2">
             <Button
               variant={filter === 'all' ? 'default' : 'outline'}
               size="sm"
@@ -277,20 +277,20 @@ export default function ClientFeedbackPanel({
           </div>
         </div>
       </CardHeader>
-      <CardContent>
-        <ScrollArea style={{ maxHeight }}>
+      <CardContent className="px-3 md:px-4">
+        <ScrollArea style={{ maxHeight }} className="md:pr-2">
           {filteredFeedbacks.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>No feedback to display</p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2 md:space-y-3">
               {filteredFeedbacks.map((feedback) => (
                 <div
                   key={feedback.id}
-                  className={`p-4 border rounded-lg transition-colors cursor-pointer hover:bg-muted/50 ${
-                    feedback.status === 'unread' ? 'bg-blue-50 border-blue-200' : 'bg-background'
+                  className={`p-3 md:p-4 border rounded-lg transition-colors cursor-pointer hover:bg-muted/50 ${
+                    feedback.status === 'unread' ? 'bg-blue-50/60 border-blue-200' : 'bg-background'
                   }`}
                   onClick={() => markAsRead(feedback.id)}
                 >

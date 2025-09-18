@@ -1,3 +1,29 @@
+  const handleDownload = async (url: string) => {
+    try {
+      // Expect URLs like /uploads/filename.ext or absolute http(s)
+      const isAbsolute = /^https?:\/\//i.test(url);
+      const path = isAbsolute ? new URL(url).pathname : url;
+      const downloadUrl = `/api/download?path=${encodeURIComponent(path)}`;
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.target = '_blank';
+      a.rel = 'noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (e: any) {
+      toast({ title: 'Download failed', description: e?.message || 'Unable to download file', variant: 'destructive' });
+    }
+  };
+
+  const handleCopyLink = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast({ title: 'Copied', description: 'Link copied to clipboard' });
+    } catch {
+      toast({ title: 'Copy failed', description: 'Unable to copy link', variant: 'destructive' });
+    }
+  };
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -98,17 +124,18 @@ export function ChatThread({ coachId, clientId, currentUserId, title = "Messages
     if (!text.trim() && !selectedFile) return;
     
     try {
-      let attachmentUrl = null;
+      let attachmentUrl: string | null = null;
       if (selectedFile) {
         const uploadResult = await apiUploadFile(selectedFile);
         attachmentUrl = uploadResult.url;
       }
+      const body = [text.trim(), attachmentUrl].filter(Boolean).join("\n");
       
       sendMutation.mutate({
         coachId,
         clientId,
         senderId: currentUserId,
-        body: text.trim() || ""
+        body
       });
       
       setText("");
@@ -176,18 +203,45 @@ export function ChatThread({ coachId, clientId, currentUserId, title = "Messages
                         const isVideo = /\.(mp4|webm|mov|qt)$/i.test(trimmed);
                         if (isUrl && isImage) {
                           return (
-                            <a key={idx} href={trimmed} target="_blank" rel="noreferrer">
-                              <img src={trimmed} alt="attachment" className="max-h-48 rounded-md" />
-                            </a>
+                            <div key={idx} className="space-y-1">
+                              <a href={trimmed} target="_blank" rel="noreferrer">
+                                <img src={trimmed} alt="attachment" className="max-h-48 rounded-md" />
+                              </a>
+                              <div className="flex gap-2 text-[11px]">
+                                <Button size="sm" variant="outline" className="h-6 px-2 py-0" onClick={() => window.open(trimmed, '_blank')}>Open</Button>
+                                <Button size="sm" variant="outline" className="h-6 px-2 py-0" onClick={() => handleDownload(trimmed)}>Download</Button>
+                                <Button size="sm" variant="outline" className="h-6 px-2 py-0" onClick={() => handleCopyLink(trimmed)}>Copy Link</Button>
+                              </div>
+                            </div>
                           );
                         }
                         if (isUrl && isVideo) {
                           return (
-                            <video key={idx} src={trimmed} controls className="max-h-56 rounded-md" />
+                            <div key={idx} className="space-y-1">
+                              <video src={trimmed} controls className="max-h-56 rounded-md" />
+                              <div className="flex gap-2 text-[11px]">
+                                <Button size="sm" variant="outline" className="h-6 px-2 py-0" onClick={() => window.open(trimmed, '_blank')}>Open</Button>
+                                <Button size="sm" variant="outline" className="h-6 px-2 py-0" onClick={() => handleDownload(trimmed)}>Download</Button>
+                                <Button size="sm" variant="outline" className="h-6 px-2 py-0" onClick={() => handleCopyLink(trimmed)}>Copy Link</Button>
+                              </div>
+                            </div>
                           );
                         }
                         return (
-                          <div key={idx} className="whitespace-pre-wrap break-words leading-snug">{line}</div>
+                          <div key={idx} className="whitespace-pre-wrap break-words leading-snug">
+                            {isUrl ? (
+                              <div className="space-y-1">
+                                <a href={trimmed} className="underline" target="_blank" rel="noreferrer">{trimmed}</a>
+                                <div className="flex gap-2 text-[11px]">
+                                  <Button size="sm" variant="outline" className="h-6 px-2 py-0" onClick={() => window.open(trimmed, '_blank')}>Open</Button>
+                                  <Button size="sm" variant="outline" className="h-6 px-2 py-0" onClick={() => handleDownload(trimmed)}>Download</Button>
+                                  <Button size="sm" variant="outline" className="h-6 px-2 py-0" onClick={() => handleCopyLink(trimmed)}>Copy Link</Button>
+                                </div>
+                              </div>
+                            ) : (
+                              line
+                            )}
+                          </div>
                         );
                       })}
                       {/* Attached workout pill */}

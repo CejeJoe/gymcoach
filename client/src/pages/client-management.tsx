@@ -472,123 +472,38 @@ export default function ClientManagement({ user }: ClientManagementProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      {/* Coach Profile Header */}
-      <div className="px-4 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
-              <span className="text-primary-foreground font-semibold text-sm">CG</span>
-            </div>
-            <span className="text-foreground font-medium">Coach Grace</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="w-8 h-8">
-              <div className="w-4 h-4 border border-foreground rounded"></div>
-            </Button>
-            <Button variant="ghost" size="icon" className="w-8 h-8">
-              <div className="w-4 h-4 border border-foreground rounded-full"></div>
-            </Button>
-          </div>
+    <div className="min-h-screen bg-background pb-24">
+      {/* Simple Header */}
+      <div className="px-4 py-4 flex items-center justify-between">
+        <div>
+          <h1 className="font-bold text-base sm:text-lg">Clients</h1>
+          <p className="text-xs text-muted-foreground">{totalClients} total</p>
         </div>
+        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="rounded-xl">Add Client</Button>
+          </DialogTrigger>
+          <DialogContent className="glass-morphism border-white/10">
+            <DialogHeader>
+              <DialogTitle>Add New Client</DialogTitle>
+              <DialogDescription>
+                Enter the client's information to add them to your dashboard.
+              </DialogDescription>
+            </DialogHeader>
+            <FormProvider {...form}>
+              <ClientForm 
+                control={form.control}
+                onSubmit={(data) => { setPendingEmail(data.email); addClientMutation.mutate(data); }}
+                onCancel={() => setIsAddDialogOpen(false)}
+                isSubmitting={addClientMutation.isPending}
+              />
+            </FormProvider>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Main Content */}
       <div className="px-4 space-y-6">
-        {/* Today's Session */}
-        <div>
-          <div className="bg-card rounded-2xl p-4 border border-border">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <span className="text-primary-foreground text-xs font-bold">Wed</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground text-sm">Time to workout</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-foreground font-medium">15</span>
-                  <span className="text-muted-foreground text-sm">min</span>
-                </div>
-              </div>
-            </div>
-            <h3 className="text-foreground font-semibold text-lg mb-2">Today's Session</h3>
-            <div className="bg-primary/10 rounded-xl p-4 mb-4">
-              <h4 className="text-foreground font-semibold mb-1">Strength</h4>
-              <p className="text-muted-foreground text-sm mb-3">Random center</p>
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-muted-foreground">35 min</span>
-                <span className="text-muted-foreground">•</span>
-                <span className="text-muted-foreground">530 kcal</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Categories Section */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-foreground font-semibold text-lg">Categories</h3>
-            <Button variant="ghost" className="text-muted-foreground text-sm">See All</Button>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-card rounded-2xl p-4 border border-border">
-              <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center mb-3">
-                <Users className="w-6 h-6 text-primary" />
-              </div>
-              <h4 className="font-semibold text-foreground mb-1">Yoga</h4>
-              <p className="text-muted-foreground text-sm">100 Exercises</p>
-            </div>
-            <div className="bg-card rounded-2xl p-4 border border-border">
-              <div className="w-12 h-12 bg-red-500/20 rounded-xl flex items-center justify-center mb-3">
-                <Target className="w-6 h-6 text-red-500" />
-              </div>
-              <h4 className="font-semibold text-foreground mb-1">Boxing</h4>
-              <p className="text-muted-foreground text-sm">50 Exercises</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Client Management Section */}
-        <div className="bg-primary rounded-3xl p-6 relative overflow-hidden mb-4">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <h2 className="text-primary-foreground font-bold text-xl mb-1">Client Management</h2>
-              <div className="flex items-center gap-2 text-primary-foreground/80 text-sm">
-                <span className="w-2 h-2 bg-primary-foreground rounded-full"></span>
-                <span>{totalClients} Clients</span>
-              </div>
-              <div className="flex items-center gap-2 text-primary-foreground/80 text-sm mt-1">
-                <span className="w-2 h-2 bg-primary-foreground rounded-full"></span>
-                <span>30min</span>
-              </div>
-            </div>
-            <div className="w-16 h-16 bg-primary-foreground/20 rounded-2xl flex items-center justify-center">
-              <Users className="w-8 h-8 text-primary-foreground" />
-            </div>
-          </div>
-          <Button className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 rounded-full px-6">
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <span>Add Client</span>
-              </DialogTrigger>
-              <DialogContent className="glass-morphism border-white/10">
-                <DialogHeader>
-                  <DialogTitle>Add New Client</DialogTitle>
-                  <DialogDescription>
-                    Enter the client's information to add them to your dashboard.
-                  </DialogDescription>
-                </DialogHeader>
-                <FormProvider {...form}>
-                  <ClientForm 
-                    control={form.control}
-                    onSubmit={(data) => { setPendingEmail(data.email); addClientMutation.mutate(data); }}
-                    onCancel={() => setIsAddDialogOpen(false)}
-                    isSubmitting={addClientMutation.isPending}
-                  />
-                </FormProvider>
-              </DialogContent>
-            </Dialog>
-          </Button>
-        </div>
 
         {/* Clients List */}
         <div className="space-y-4">
@@ -714,63 +629,17 @@ export default function ClientManagement({ user }: ClientManagementProps) {
             </div>
           )}
         </div>
-
-        {/* Dynamic Warm-up Section */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-foreground font-semibold text-lg">Dynamic Warm-up</h3>
-            <Button variant="ghost" className="text-muted-foreground text-sm">See All</Button>
-          </div>
-          <div className="space-y-3">
-            <div className="bg-card rounded-2xl p-4 border border-border">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-muted rounded-xl flex-shrink-0"></div>
-                <div className="flex-1">
-                  <h4 className="font-semibold text-foreground mb-1">Biceps curl</h4>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span>15 minutes</span>
-                    <span>Beginner</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="bg-card rounded-2xl p-4 border border-border">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-muted rounded-xl flex-shrink-0"></div>
-                <div className="flex-1">
-                  <h4 className="font-semibold text-foreground mb-1">Pull Up</h4>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span>15 minutes</span>
-                    <span>Beginner</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* Removed non-functional placeholder sections for a cleaner UI */}
       </div>
 
-      {/* Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border">
-        <div className="flex items-center justify-center py-4">
-          <div className="flex items-center gap-8">
-            <Button className="bg-primary text-primary-foreground rounded-full px-6 py-2 font-medium">
-              Home
-            </Button>
-            <Button variant="ghost" size="icon" className="w-10 h-10">
-              <div className="w-5 h-5 border-2 border-foreground"></div>
-            </Button>
-            <Button variant="ghost" size="icon" className="w-10 h-10">
-              <div className="w-5 h-5 border-2 border-foreground"></div>
-            </Button>
-            <Button variant="ghost" size="icon" className="w-10 h-10">
-              <div className="w-5 h-5 border-2 border-foreground rounded-full"></div>
-            </Button>
-          </div>
-        </div>
+      {/* Floating Add Client button (mobile) */}
+      <div className="md:hidden fixed bottom-16 right-4">
+        <Button className="rounded-full shadow-lg" onClick={() => setIsAddDialogOpen(true)}>
+          <UserPlus className="h-4 w-4 mr-2" /> Add
+        </Button>
       </div>
 
-
+      
       {/* New Client Credentials Dialog */}
       <Dialog open={!!newClientCreds} onOpenChange={(open) => !open && setNewClientCreds(null)}>
         <DialogContent className="glass-morphism border-white/10">

@@ -1,12 +1,18 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { authStorage, getAuthHeaders } from "./auth";
 
-async function throwIfResNotOk(res: Response) {
+async function throwIfResNotOk(res: Response, urlForContext?: string) {
   if (!res.ok) {
     // Handle auth errors specifically
     if (res.status === 401 || res.status === 403) {
-      authStorage.clear();
-      window.location.href = '/login';
+      const url = String(urlForContext || '');
+      const isAuthEndpoint = /\/api\/auth\//.test(url);
+      if (!isAuthEndpoint) {
+        authStorage.clear();
+        // Redirect to root where the router will render the LoginPage.
+        // This avoids hitting a non-existent /login route (404).
+        window.location.href = '/';
+      }
     }
     const text = (await res.text()) || res.statusText;
     throw new Error(`${res.status}: ${text}`);
@@ -35,7 +41,7 @@ export async function apiRequest(
     cache: 'no-store',
   });
 
-  await throwIfResNotOk(res);
+  await throwIfResNotOk(res, requestUrl);
   return res;
 }
 
@@ -61,7 +67,7 @@ export const getQueryFn: <T>(options: {
       return null;
     }
 
-    await throwIfResNotOk(res);
+    await throwIfResNotOk(res, qUrl);
     return await res.json();
   };
 
@@ -85,14 +91,30 @@ export async function apiUploadFile(file: File): Promise<{ url: string; mime: st
 {
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch("/api/uploads", {
+  const uploadUrl = `${window.location.origin}/api/uploads`;
+  const res = await fetch(uploadUrl, {
     method: "POST",
     headers: {
       // DO NOT set Content-Type for multipart; browser will set boundary
       ...getAuthHeaders(),
     } as any,
     body: form,
+    cache: 'no-store',
   });
-  await (async () => { if (!res.ok) { const t = (await res.text()) || res.statusText; throw new Error(`${res.status}: ${t}`); } })();
-  return await res.json();
+  if (!res.ok) {
+    const t = (await res.text()) || res.statusText;
+    throw new Error(`${res.status}: ${t}`);
+  }
+  const ct = res.headers.get('content-type') || '';
+  const text = await res.text();
+  if (!/application\/json/.test(ct)) {
+    // Likely got an HTML page (e.g., dev server fallback). Surface details.
+    const snippet = text.slice(0, 120);
+    throw new Error(`Unexpected response from /api/uploads. Expected JSON but got '${ct}'. Snippet: ${snippet}`);
+  }
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new Error(`Invalid JSON from /api/uploads: ${(e as Error).message}`);
+  }
 }

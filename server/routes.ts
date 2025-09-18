@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import multer from "multer";
@@ -36,9 +37,96 @@ const upload = multer({
 });
 
 export function registerRoutes(app: Express): Server {
+  // Serve uploaded files
+  app.use("/uploads", express.static(uploadDir));
+
   // Health check
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
+  // Force-download endpoint for files under /uploads
+  app.get("/api/download", authenticateToken, async (req: any, res) => {
+    try {
+      const relPath = String(req.query.path || "");
+      const downloadName = req.query.name ? String(req.query.name) : undefined;
+      if (!relPath.startsWith("/uploads/")) {
+        return res.status(400).json({ message: "Invalid path" });
+      }
+      const absPath = path.join(process.cwd(), relPath);
+      // Ensure the path is within uploadDir to prevent traversal
+      const normalized = path.normalize(absPath);
+      if (!normalized.startsWith(uploadDir)) {
+        return res.status(400).json({ message: "Invalid path" });
+      }
+      if (!fs.existsSync(normalized)) {
+        return res.status(404).json({ message: "File not found" });
+      }
+      return res.download(normalized, downloadName || path.basename(normalized));
+    } catch (error: any) {
+      console.error("Download error:", error?.message || error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Upload endpoint for chat attachments and avatars
+  app.post("/api/uploads", authenticateToken, upload.single("file"), async (req: any, res) => {
+    try {
+      // Minimal logging to aid debugging
+      // console.log('[upload] user', req.user?.userId, 'file?', Boolean(req.file));
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+      const file = req.file;
+      const urlPath = `/uploads/${file.filename}`;
+      return res.status(201).json({
+        url: urlPath,
+        mime: file.mimetype,
+        size: file.size,
+        originalName: file.originalname,
+      });
+    } catch (error: any) {
+      console.error('Upload error:', error?.message || error);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  // Update current user's profile
+  app.patch("/api/me", authenticateToken, async (req: any, res) => {
+    try {
+      const userId = req.user.userId;
+      const { firstName, lastName, email, avatar } = req.body || {};
+
+      // Basic validation: require at least one field
+      if (
+        firstName === undefined &&
+        lastName === undefined &&
+        email === undefined &&
+        avatar === undefined
+      ) {
+        return res.status(400).json({ message: "No fields to update" });
+      }
+
+      // Apply updates
+      const updated = await storage.updateUserProfile(userId, {
+        firstName,
+        lastName,
+        email,
+        avatar,
+      } as any);
+
+      return res.json({
+        id: updated.id,
+        email: updated.email,
+        firstName: (updated as any).firstName,
+        lastName: (updated as any).lastName,
+        role: (updated as any).role,
+        avatar: (updated as any).avatar ?? null,
+      });
+    } catch (error: any) {
+      console.error('Update /api/me error:', error?.message || error);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
   });
 
   // Send a scheduled group message immediately (bypass scheduler)
