@@ -95,7 +95,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           <div className="w-20 h-20 mx-auto mb-4 thrst-gradient rounded-2xl flex items-center justify-center animate-pulse-glow">
             <Dumbbell className="h-8 w-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">THRST Coach</h1>
+          <h1 className="text-3xl font-bold text-white mb-2">E-shred-x-periodization</h1>
           <p className="text-gray-300 text-sm">Premium Fitness Management</p>
         </div>
         

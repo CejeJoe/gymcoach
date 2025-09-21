@@ -1,8 +1,8 @@
-# THRST Gym Coach App
+# E-shred-x-periodization Gym Coach App
 
 ## Overview
 
-THRST is a modern gym coach application designed to help fitness coaches manage their clients, track workouts, and monitor progress. The application features a dual interface for both coaches and clients, with comprehensive workout management, progress tracking, and data visualization capabilities. Built with a focus on user experience, it employs a dark/light theme system and modern UI components for an intuitive fitness management platform.
+E-shred-x-periodization is a modern gym coach application designed to help fitness coaches manage their clients, track workouts, and monitor progress. The application features a dual interface for both coaches and clients, with comprehensive workout management, progress tracking, and data visualization capabilities. Built with a focus on user experience, it employs a dark/light theme system and modern UI components for an intuitive fitness management platform.
 
 ## User Preferences
 
@@ -58,7 +58,7 @@ The authentication system implements:
 The application implements a comprehensive design system:
 
 - **Component Library**: Built on Radix UI for accessibility and behavioral consistency
-- **THRST Brand Colors**: Custom color palette with green primary (#00ffab) and orange accent (#ff3c00)
+- **E-shred-x-periodization Brand Colors**: Custom color palette with green primary (#00ffab) and orange accent (#ff3c00)
 - **Responsive Design**: Mobile-first approach with collapsible navigation
 - **Glass Morphism**: Modern UI effects with backdrop blur and transparency
 - **Animation System**: Smooth transitions and micro-interactions for enhanced UX
