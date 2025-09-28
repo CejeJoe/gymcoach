@@ -32,6 +32,7 @@ export const clientFormSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Invalid email address"),
+  phone: z.string().min(1, "Phone is required"),
   goals: z.string().optional(),
   generateTempPassword: z.boolean().default(true),
   currentWeight: z.union([
@@ -152,6 +153,7 @@ export default function ClientManagement({ user }: ClientManagementProps) {
           email: formData.email,
           firstName: formData.firstName,
           lastName: formData.lastName,
+          phone: formData.phone || undefined,
           goals: formData.goals ? { description: formData.goals } : null,
           generateTempPassword: formData.generateTempPassword ?? true,
           currentWeight: formData.currentWeight !== null ? Number(formData.currentWeight) : null,
@@ -226,7 +228,7 @@ export default function ClientManagement({ user }: ClientManagementProps) {
   });
 
   const updateClientMutation = useMutation({
-    mutationFn: async ({ clientId, data }: { clientId: string; data: Partial<ClientFormValues> }) => {
+    mutationFn: async ({ clientId, data }: { clientId: string; data: any }) => {
       const response = await fetch(`/api/coach/clients/${clientId}`, {
         method: 'PUT',
         headers: {
@@ -324,6 +326,7 @@ export default function ClientManagement({ user }: ClientManagementProps) {
       firstName: '',
       lastName: '',
       email: '',
+      phone: '',
       goals: '',
       generateTempPassword: true,
       currentWeight: null,
@@ -339,6 +342,7 @@ export default function ClientManagement({ user }: ClientManagementProps) {
       firstName: '',
       lastName: '',
       email: '',
+      phone: '',
       goals: '',
       currentWeight: null,
       targetWeight: null,
@@ -356,6 +360,7 @@ export default function ClientManagement({ user }: ClientManagementProps) {
       firstName: editingClient.user?.firstName || '',
       lastName: editingClient.user?.lastName || '',
       email: editingClient.user?.email || '',
+      phone: (editingClient.user as any)?.phone || '',
       goals: goalsText,
       currentWeight: editingClient.currentWeight ?? null,
       targetWeight: editingClient.targetWeight ?? null,
@@ -363,88 +368,29 @@ export default function ClientManagement({ user }: ClientManagementProps) {
     });
   }, [editingClient, editForm]);
 
-  const handleEditClientSubmit = async (formData: z.infer<typeof clientFormSchema>) => {
-    if (!editingClient) return;
-    
-    try {
-      const updateData = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        goals: formData.goals ? { description: formData.goals } : null,
-        currentWeight: formData.currentWeight,
-        targetWeight: formData.targetWeight,
-        height: formData.height,
-      };
-      
-      await updateClientMutation.mutateAsync({
-        clientId: editingClient.id,
-        data: updateData,
-      });
-      
-      setEditingClient(null);
-    } catch (error) {
-      console.error("Error updating client:", error);
-      // Error is handled by the mutation's onError
-    }
-  };
-
-  const handleEditClient = async (formData: z.infer<typeof clientFormSchema>) => {
-    if (!selectedClient) return;
-    
-    setIsSaving(true);
-    try {
-      const updateData = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        goals: formData.goals ? { description: formData.goals } : null,
-        currentWeight: formData.currentWeight,
-        targetWeight: formData.targetWeight,
-        height: formData.height,
-      };
-
-      const response = await fetch(`/api/coach/clients/${selectedClient.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          ...getAuthHeaders(),
-        },
-        body: JSON.stringify(updateData),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update client');
-      }
-
-      // Update the selected client with new data
-      const updatedClient = await response.json();
-      setSelectedClient(updatedClient);
-      
-      // Update the clients list
-      queryClient.setQueryData(['/api/coach/clients'], (old: any) => ({
-        clients: old.clients.map((c: ClientData) => 
-          c.id === updatedClient.id ? updatedClient : c
-        )
-      }));
-
-      toast({
-        title: 'Success',
-        description: 'Client updated successfully',
-      });
-      
-      setIsEditing(false);
-    } catch (error) {
-      console.error('Error updating client:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update client. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
+const handleEditClientSubmit = async (formData: z.infer<typeof clientFormSchema>) => {
+  if (!editingClient) return;
+  try {
+    const updateData: any = {
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      email: formData.email,
+      phone: formData.phone,
+      goals: formData.goals ? { description: formData.goals } : null,
+      currentWeight: formData.currentWeight,
+      targetWeight: formData.targetWeight,
+      height: formData.height,
+    };
+    await updateClientMutation.mutateAsync({
+      clientId: editingClient.id,
+      data: updateData,
+    });
+    setEditingClient(null);
+  } catch (error) {
+    console.error("Error updating client:", error);
+    // Error is handled by the mutation's onError
+  }
+};
 
   const handleDelete = (clientId: string) => {
     if (confirm('Are you sure you want to remove this client?')) {
@@ -492,7 +438,6 @@ export default function ClientManagement({ user }: ClientManagementProps) {
             </DialogHeader>
             <FormProvider {...form}>
               <ClientForm 
-                control={form.control}
                 onSubmit={(data) => { setPendingEmail(data.email); addClientMutation.mutate(data); }}
                 onCancel={() => setIsAddDialogOpen(false)}
                 isSubmitting={addClientMutation.isPending}
@@ -699,7 +644,7 @@ export default function ClientManagement({ user }: ClientManagementProps) {
                       <FormItem>
                         <FormLabel htmlFor="edit-first-name">First Name</FormLabel>
                         <FormControl>
-                          <Input {...field} id="edit-first-name" name="firstName" autoComplete="given-name" data-testid="edit-first-name" />
+                          <Input {...field} id="edit-first-name" autoComplete="given-name" data-testid="edit-first-name" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -712,7 +657,7 @@ export default function ClientManagement({ user }: ClientManagementProps) {
                       <FormItem>
                         <FormLabel htmlFor="edit-last-name">Last Name</FormLabel>
                         <FormControl>
-                          <Input {...field} id="edit-last-name" name="lastName" autoComplete="family-name" data-testid="edit-last-name" />
+                          <Input {...field} id="edit-last-name" autoComplete="family-name" data-testid="edit-last-name" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -725,7 +670,20 @@ export default function ClientManagement({ user }: ClientManagementProps) {
                       <FormItem>
                         <FormLabel htmlFor="edit-email">Email</FormLabel>
                         <FormControl>
-                          <Input type="email" {...field} id="edit-email" name="email" autoComplete="email" data-testid="edit-email" />
+                          <Input type="email" {...field} id="edit-email" autoComplete="email" data-testid="edit-email" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={editForm.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel htmlFor="edit-phone">Phone</FormLabel>
+                        <FormControl>
+                          <Input type="tel" {...field} id="edit-phone" autoComplete="tel" data-testid="edit-phone" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -741,7 +699,6 @@ export default function ClientManagement({ user }: ClientManagementProps) {
                           <Input
                             type="number"
                             id="edit-current-weight"
-                            name="currentWeight"
                             {...field}
                             value={field.value || ''}
                             onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : '')}
@@ -762,7 +719,6 @@ export default function ClientManagement({ user }: ClientManagementProps) {
                           <Input
                             type="number"
                             id="edit-target-weight"
-                            name="targetWeight"
                             {...field}
                             value={field.value || ''}
                             onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : '')}
@@ -782,7 +738,6 @@ export default function ClientManagement({ user }: ClientManagementProps) {
                         <FormControl>
                           <Textarea
                             id="edit-goals"
-                            name="goals"
                             {...field}
                             value={field.value || ''}
                             className="min-h-[100px]"

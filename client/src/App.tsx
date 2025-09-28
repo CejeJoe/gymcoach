@@ -15,6 +15,10 @@ import WorkoutLogging from "@/pages/workout-logging";
 import WorkoutDashboard from "@/pages/workout-dashboard";
 import NotFound from "@/pages/not-found";
 import ShareEmbed from "@/pages/share";
+import RegisterCoachPage from "@/pages/register-coach";
+import AdminCoachesPage from "@/pages/admin-coaches";
+import AdminCoachDetailPage from "@/pages/admin-coach-detail";
+import AdminOverviewPage from "@/pages/admin-overview";
 
 function Router() {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -54,9 +58,27 @@ function Router() {
 
   return (
     <Switch>
+      {/* Root route: show login when unauthenticated, otherwise role-based home */}
+      <Route path="/">
+        {!user ? (
+          <LoginPage onLogin={handleLogin} />
+        ) : user.role === 'admin' ? (
+          <AdminOverviewPage user={user} onLogout={handleLogout} />
+        ) : user.role === 'coach' ? (
+          <CoachDashboard user={user} onLogout={handleLogout} />
+        ) : (
+          <ClientPortal user={user} onLogout={handleLogout} />
+        )}
+      </Route>
+
       {/* Public, unauthenticated share route */}
       <Route path="/share">
         <ShareEmbed />
+      </Route>
+
+      {/* Public: Register as Coach */}
+      <Route path="/register-coach">
+        <RegisterCoachPage />
       </Route>
 
       {/* Workout logging route - requires authentication */}
@@ -86,14 +108,34 @@ function Router() {
         )}
       </Route>
 
-      {/* Auth-gated app routes */}
-      <Route path="/">
+      {/* Admin overview */}
+      <Route path="/admin">
         {!user ? (
           <LoginPage onLogin={handleLogin} />
-        ) : user.role === 'coach' ? (
-          <CoachDashboard user={user} onLogout={handleLogout} />
+        ) : user.role !== 'admin' ? (
+          <NotFound />
         ) : (
-          <ClientPortal user={user} onLogout={handleLogout} />
+          <AdminOverviewPage user={user} onLogout={handleLogout} />
+        )}
+      </Route>
+
+      {/* Admin routes */}
+      <Route path="/admin/coaches">
+        {!user ? (
+          <LoginPage onLogin={handleLogin} />
+        ) : user.role !== 'admin' ? (
+          <NotFound />
+        ) : (
+          <AdminCoachesPage user={user} onLogout={handleLogout} />
+        )}
+      </Route>
+      <Route path="/admin/coaches/:id">
+        {!user ? (
+          <LoginPage onLogin={handleLogin} />
+        ) : user.role !== 'admin' ? (
+          <NotFound />
+        ) : (
+          <AdminCoachDetailPage user={user} onLogout={handleLogout} />
         )}
       </Route>
       <Route component={NotFound} />

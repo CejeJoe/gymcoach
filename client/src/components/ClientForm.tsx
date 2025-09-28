@@ -97,7 +97,6 @@ export const ClientForm: React.FC<ClientFormProps> = ({
                   <Input 
                     {...field}
                     id="firstName"
-                    name="firstName"
                     type="text"
                     value={field.value ?? ''}
                     data-testid="first-name"
@@ -118,7 +117,6 @@ export const ClientForm: React.FC<ClientFormProps> = ({
                   <Input 
                     {...field}
                     id="lastName"
-                    name="lastName"
                     type="text"
                     value={field.value ?? ''}
                     data-testid="last-name"
@@ -141,11 +139,32 @@ export const ClientForm: React.FC<ClientFormProps> = ({
                 <Input 
                   {...field}
                   id="email"
-                  name="email"
                   type="email"
                   value={field.value ?? ''}
                   data-testid="email"
                   autoComplete="email"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={control}
+          name="phone"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel htmlFor="phone">Phone</FormLabel>
+              <FormControl>
+                <Input
+                  {...field}
+                  id="phone"
+                  type="tel"
+                  value={field.value ?? ''}
+                  data-testid="phone"
+                  autoComplete="tel"
+                  placeholder="e.g., +1 555 123 4567"
                 />
               </FormControl>
               <FormMessage />
@@ -224,7 +243,7 @@ export const ClientForm: React.FC<ClientFormProps> = ({
                     placeholder="Enter client's goals..."
                     className="min-h-[100px]"
                     value={field.value ?? ''}
-                    onChange={(e) => field.onChange(e.target.value || null)}
+                    onChange={(e) => field.onChange(e.target.value)}
                     data-testid="goals"
                   />
                 </FormControl>
@@ -243,7 +262,6 @@ export const ClientForm: React.FC<ClientFormProps> = ({
               <div className="flex items-center gap-2">
                 <input
                   id="generateTempPassword"
-                  name="generateTempPassword"
                   type="checkbox"
                   checked={Boolean(field.value)}
                   onChange={(e) => field.onChange(e.target.checked)}

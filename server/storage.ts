@@ -38,7 +38,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUserPassword(userId: string, hashedPassword: string): Promise<void>;
-  updateUserProfile(userId: string, updates: Partial<Pick<User, 'email' | 'firstName' | 'lastName' | 'avatar'>>): Promise<User>;
+  updateUserProfile(userId: string, updates: Partial<Pick<User, 'email' | 'firstName' | 'lastName' | 'avatar' | 'phone'>>): Promise<User>;
   
   // Client methods
   getClientsByCoach(
@@ -58,9 +58,11 @@ export interface IStorage {
   // Workout methods
   getWorkout(workoutId: string): Promise<Workout | undefined>;
   getWorkoutsByClient(clientId: string): Promise<Workout[]>;
-  getWorkoutsByCoach(coachId: string, options?: { startDate?: Date; endDate?: Date }): Promise<Workout[]>;
+  getWorkoutsByCoach(coachId: string, options?: { startDate?: Date; endDate?: Date; includeCompleted?: boolean; clientId?: string; limit?: number; includeDeleted?: boolean }): Promise<Workout[]>;
   createWorkout(workout: InsertWorkout): Promise<Workout>;
   completeWorkout(workoutId: string, duration: number, notes?: string): Promise<Workout>;
+  deleteWorkout(workoutId: string): Promise<void>;
+  restoreWorkout(workoutId: string): Promise<void>;
   
   // Progress methods
   getProgressByClient(clientId: string): Promise<ProgressEntry[]>;
@@ -101,6 +103,34 @@ export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user || undefined;
+  }
+
+  async deleteWorkout(workoutId: string): Promise<void> {
+    try {
+      // Soft delete: set deletedAt; do not hard-delete row
+      await db.update(workouts).set({ deletedAt: new Date() } as any).where(eq(workouts.id, workoutId));
+    } catch (error) {
+      // Fallback if column doesn't exist yet
+      if (String((error as any)?.message || '').includes('deleted_at')) {
+        await db.delete(workouts).where(eq(workouts.id, workoutId));
+        return;
+      }
+      console.error('Error in deleteWorkout:', error);
+      throw new Error(`Failed to delete workout: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async restoreWorkout(workoutId: string): Promise<void> {
+    try {
+      await db.update(workouts).set({ deletedAt: null } as any).where(eq(workouts.id, workoutId));
+    } catch (error) {
+      // If no deleted_at column yet, nothing to restore; ignore
+      if (String((error as any)?.message || '').includes('deleted_at')) {
+        return;
+      }
+      console.error('Error in restoreWorkout:', error);
+      throw new Error(`Failed to restore workout: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   async getRecentClientFeedbackByCoach(coachId: string, limit: number = 20): Promise<{
@@ -387,8 +417,33 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
-    return user || undefined;
+    try {
+      // First, try a raw SQL query that does not enumerate columns,
+      // so it won't fail if optional columns (like phone) are missing.
+      const { sql } = await import('drizzle-orm');
+      const rows: any[] = (await db.execute(sql`select * from "users" where "email" = ${email} limit 1`)) as any;
+      const row = Array.isArray(rows) ? rows[0] : undefined;
+      if (row) return row as User;
+
+      // Fallback to typed select (should be fine if schema matches DB)
+      const [user] = await db.select().from(users).where(eq(users.email, email));
+      return user || undefined;
+    } catch (err: any) {
+      // Self-heal common migration gap: users.phone missing
+      const msg = String(err?.message || err);
+      if (err?.code === '42703' || msg.includes('column "phone" does not exist')) {
+        try {
+          const { sql } = await import('drizzle-orm');
+          // @ts-ignore drizzle types
+          await db.execute(sql`alter table "users" add column if not exists "phone" varchar`);
+          const rows2: any[] = (await db.execute(sql`select * from "users" where "email" = ${email} limit 1`)) as any;
+          return (Array.isArray(rows2) ? rows2[0] : undefined) as User | undefined;
+        } catch (e) {
+          console.error('[storage] Failed to self-heal users.phone:', e);
+        }
+      }
+      throw err;
+    }
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
@@ -405,12 +460,13 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId));
   }
 
-  async updateUserProfile(userId: string, updates: Partial<Pick<User, 'email' | 'firstName' | 'lastName' | 'avatar'>>): Promise<User> {
+  async updateUserProfile(userId: string, updates: Partial<Pick<User, 'email' | 'firstName' | 'lastName' | 'avatar' | 'phone'>>): Promise<User> {
     const payload: any = {};
     if (updates.email !== undefined) payload.email = updates.email;
     if (updates.firstName !== undefined) payload.firstName = updates.firstName as any;
     if (updates.lastName !== undefined) payload.lastName = updates.lastName as any;
     if ((updates as any).avatar !== undefined) payload.avatar = (updates as any).avatar;
+    if ((updates as any).phone !== undefined) payload.phone = (updates as any).phone;
     payload.updatedAt = new Date();
 
     await db
@@ -463,6 +519,7 @@ export class DatabaseStorage implements IStorage {
             firstName: users.firstName,
             lastName: users.lastName,
             avatar: users.avatar,
+            phone: (users as any).phone,
           }
         })
         .from(clients)
@@ -556,6 +613,7 @@ export class DatabaseStorage implements IStorage {
           firstName: result.users.firstName,
           lastName: result.users.lastName,
           avatar: result.users.avatar,
+          phone: (result.users as any).phone,
         } : null,
         isActive: Boolean(result.clients.isActive)
       };
@@ -628,48 +686,42 @@ export class DatabaseStorage implements IStorage {
     try {
       exercises = Array.isArray(workout.exercises)
         ? workout.exercises
-        : (typeof workout.exercises === 'string' 
-            ? JSON.parse(workout.exercises) 
+        : (typeof workout.exercises === 'string'
+            ? JSON.parse(workout.exercises)
             : []);
     } catch (error) {
       console.error('Error parsing exercises:', error);
       exercises = [];
     }
-    
-    // Convert to Date objects robustly and ALWAYS return a Date
-    const toDate = (timestamp: any): Date => {
-      if (!timestamp) return new Date();
-      if (timestamp instanceof Date) return timestamp;
-      if (typeof timestamp === 'number') return new Date(timestamp);
+
+    // Robust date conversion. Return null for falsy values (so completedAt stays null if not set).
+    const toDateOrNull = (timestamp: any): Date | null => {
+      if (!timestamp) return null;
+      if (timestamp instanceof Date) return isNaN(timestamp.getTime()) ? null : timestamp;
+      if (typeof timestamp === 'number') {
+        const d = new Date(timestamp);
+        return isNaN(d.getTime()) ? null : d;
+      }
       const num = Number(timestamp);
-      if (!Number.isNaN(num)) return new Date(num);
+      if (!Number.isNaN(num)) {
+        const d = new Date(num);
+        return isNaN(d.getTime()) ? null : d;
+      }
       const d = new Date(timestamp);
-      return Number.isNaN(d.getTime()) ? new Date() : d;
+      return isNaN(d.getTime()) ? null : d;
     };
-    
-    // Ensure all required fields are present with proper types
+
+    const createdAt = toDateOrNull(workout.createdAt) || new Date();
+    const updatedAt = toDateOrNull(workout.updatedAt) || new Date();
+
     const processedWorkout: Workout = {
       ...workout,
       exercises,
-      scheduledDate: toDate(workout.scheduledDate),
-      completedAt: toDate(workout.completedAt),
-      createdAt: toDate(workout.createdAt) || new Date(),
-      updatedAt: toDate(workout.updatedAt) || new Date()
+      scheduledDate: toDateOrNull(workout.scheduledDate),
+      completedAt: toDateOrNull(workout.completedAt),
+      createdAt,
+      updatedAt,
     };
-
-    // Ensure all date fields are valid Date objects or null
-    if (processedWorkout.scheduledDate && isNaN(processedWorkout.scheduledDate.getTime())) {
-      processedWorkout.scheduledDate = null;
-    }
-    if (processedWorkout.completedAt && isNaN(processedWorkout.completedAt.getTime())) {
-      processedWorkout.completedAt = null;
-    }
-    if (isNaN((processedWorkout.createdAt as Date).getTime())) {
-      processedWorkout.createdAt = new Date();
-    }
-    if (isNaN((processedWorkout.updatedAt as Date).getTime())) {
-      processedWorkout.updatedAt = new Date();
-    }
 
     return processedWorkout;
   }
@@ -678,30 +730,27 @@ export class DatabaseStorage implements IStorage {
     try {
       console.log(`[storage] Fetching workouts for client ${clientId} with options:`, options);
       
-      const conditions = [eq(workouts.clientId, clientId)];
-      if (options.includeCompleted === false) {
-        conditions.push(isNull(workouts.completedAt));
-      }
+      const baseConds: any[] = [eq(workouts.clientId, clientId)];
+      if (options.includeCompleted === false) baseConds.push(isNull(workouts.completedAt));
 
-      let query = db
-        .select()
-        .from(workouts)
-        .where(and(...conditions));
-      
-      // Apply sorting and limit
-      query = query.orderBy(desc(workouts.scheduledDate));
-      if (options.limit) {
-        query = query.limit(options.limit);
+      const withDeletedFilter = [...baseConds, isNull((workouts as any).deletedAt) as any];
+      const buildQuery = (conds: any[]) => {
+        let q = db.select().from(workouts).where(and(...conds)).orderBy(desc(workouts.createdAt));
+        if (options.limit) q = q.limit(options.limit);
+        return q;
+      };
+
+      try {
+        const results = await buildQuery(withDeletedFilter);
+        return results.map((w: any) => this.processWorkout(w));
+      } catch (e: any) {
+        // If deleted_at column doesn't exist yet, retry without filter
+        if (String(e?.message || '').includes('deleted_at')) {
+          const results = await buildQuery(baseConds);
+          return results.map((w: any) => this.processWorkout(w));
+        }
+        throw e;
       }
-      
-      const results = await query;
-      console.log(`[storage] Found ${results.length} workouts for client ${clientId}.`);
-      if(results.length > 0) {
-        console.log('[storage] First workout result:', results[0]);
-      }
-      
-      // Process each workout to ensure proper types
-      return results.map((workout: any) => this.processWorkout(workout));
     } catch (error) {
       console.error('[storage] Error in getWorkoutsByClient:', error);
       throw new Error(`Failed to fetch workouts: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -716,46 +765,39 @@ export class DatabaseStorage implements IStorage {
       clientId?: string;
       startDate?: Date;
       endDate?: Date;
+      includeDeleted?: boolean;
     } = {}
   ): Promise<Workout[]> {
     try {
       console.log(`Fetching workouts for coach ${coachId}`, options);
       
-      // Start building the query
-      let query = db
-        .select()
-        .from(workouts)
-        .where(eq(workouts.coachId, coachId));
-      
-      // Apply additional filters if provided
-      if (options.includeCompleted === false) {
-        query = query.where(isNull(workouts.completedAt));
+      const baseConds: any[] = [eq(workouts.coachId, coachId)];
+      if (options.includeCompleted === false) baseConds.push(isNull(workouts.completedAt));
+      if (options.clientId) baseConds.push(eq(workouts.clientId, options.clientId));
+      if (options.startDate) baseConds.push(sql`${workouts.scheduledDate} >= ${options.startDate}`);
+      if (options.endDate) baseConds.push(sql`${workouts.scheduledDate} <= ${options.endDate}`);
+
+      // Only filter deleted when explicitly requested (includeDeleted === false)
+      const withDeletedFilter = (options.includeDeleted === false)
+        ? [...baseConds, isNull((workouts as any).deletedAt) as any]
+        : baseConds;
+
+      const buildQuery = (conds: any[]) => {
+        let q = db.select().from(workouts).where(and(...conds)).orderBy(desc(workouts.createdAt));
+        if (options.limit) q = q.limit(options.limit);
+        return q;
+      };
+
+      try {
+        const results = await buildQuery(withDeletedFilter);
+        return results.map(w => this.processWorkout(w));
+      } catch (e: any) {
+        if (String(e?.message || '').includes('deleted_at')) {
+          const results = await buildQuery(baseConds);
+          return results.map(w => this.processWorkout(w));
+        }
+        throw e;
       }
-      
-      if (options.clientId) {
-        query = query.where(eq(workouts.clientId, options.clientId));
-      }
-      
-      if (options.startDate) {
-        query = query.where(sql`${workouts.scheduledDate} >= ${options.startDate}`);
-      }
-      
-      if (options.endDate) {
-        query = query.where(sql`${workouts.scheduledDate} <= ${options.endDate}`);
-      }
-      
-      // Apply sorting and limit
-      query = query.orderBy(desc(workouts.scheduledDate));
-      
-      if (options.limit) {
-        query = query.limit(options.limit);
-      }
-      
-      const results = await query;
-      console.log(`Found ${results.length} workouts for coach ${coachId}`);
-      
-      // Process each workout to ensure proper types
-      return results.map(workout => this.processWorkout(workout));
     } catch (error) {
       console.error('Error in getWorkoutsByCoach:', error);
       throw new Error(`Failed to fetch workouts: ${error instanceof Error ? error.message : 'Unknown error'}`);

@@ -44,6 +44,9 @@ interface ClientPortalProps {
 export default function ClientPortal({ user, onLogout }: ClientPortalProps) {
   const { theme, setTheme } = useTheme();
   const [activeTab, setActiveTab] = useState("home");
+  // Feature flag: hide client self-start workout entry points (voice/manual)
+  // Keeps functionality intact for future admin toggle; only hides UI now.
+  const SHOW_SELF_LOGGING = false;
   const qc = useQueryClient();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -323,23 +326,27 @@ export default function ClientPortal({ user, onLogout }: ClientPortalProps) {
         <div className="p-4 space-y-4">
           {/* Hero CTAs */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Button 
-              onClick={() => setLocation('/workout-logging?mode=voice')}
-              className="w-full bg-thrst-accent hover:bg-thrst-accent/90 text-black font-semibold"
-              aria-label="Start voice workout"
-            >
-              <Play className="h-4 w-4 mr-2" />
-              Start Voice Workout
-            </Button>
-            <Button 
-              onClick={() => setLocation('/workout-logging?mode=manual')}
-              variant="outline"
-              className="w-full"
-              aria-label="Start manual workout"
-            >
-              <Play className="h-4 w-4 mr-2" />
-              Start Manual Workout
-            </Button>
+            {SHOW_SELF_LOGGING && (
+              <Button 
+                onClick={() => setLocation('/workout-logging?mode=voice')}
+                className="w-full bg-thrst-accent hover:bg-thrst-accent/90 text-black font-semibold"
+                aria-label="Start voice workout"
+              >
+                <Play className="h-4 w-4 mr-2" />
+                Start Voice Workout
+              </Button>
+            )}
+            {SHOW_SELF_LOGGING && (
+              <Button 
+                onClick={() => setLocation('/workout-logging?mode=manual')}
+                variant="outline"
+                className="w-full"
+                aria-label="Start manual workout"
+              >
+                <Play className="h-4 w-4 mr-2" />
+                Start Manual Workout
+              </Button>
+            )}
             <Button 
               onClick={() => setActiveTab('progress')}
               variant="outline"
@@ -354,6 +361,8 @@ export default function ClientPortal({ user, onLogout }: ClientPortalProps) {
               const today = new Date().toDateString();
               const hasTodayAssigned = uncompleted.some(w => w.scheduledDate && new Date(w.scheduledDate).toDateString() === today);
               if (!hasTodayAssigned && uncompleted.length === 0) return null;
+              // Hide the start assigned entry if self-logging is disabled
+              if (!SHOW_SELF_LOGGING) return null;
               return (
                 <Button 
                   onClick={() => setLocation('/workout-logging?mode=manual')}
@@ -416,7 +425,9 @@ export default function ClientPortal({ user, onLogout }: ClientPortalProps) {
                         )}
                       </div>
                       <div className="flex items-center gap-2">
-                        <Button size="sm" variant="outline" onClick={() => setLocation('/workout-logging?mode=manual')} aria-label={`Start ${w.name || 'assigned'} workout`}>Start</Button>
+                        {SHOW_SELF_LOGGING && (
+                          <Button size="sm" variant="outline" onClick={() => setLocation('/workout-logging?mode=manual')} aria-label={`Start ${w.name || 'assigned'} workout`}>Start</Button>
+                        )}
                         <Button size="sm" className="bg-yellow-400 hover:bg-yellow-500 text-black" onClick={() => openComplete(w.id)} aria-label={`Mark ${w.name || 'assigned'} workout as complete`}>Complete</Button>
                       </div>
                     </div>
@@ -504,14 +515,16 @@ export default function ClientPortal({ user, onLogout }: ClientPortalProps) {
         <div className="p-4 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold">My Workouts</h2>
-            <Button 
-              onClick={() => setLocation('/workout-logging?mode=voice')}
-              size="sm"
-              className="bg-thrst-accent hover:bg-thrst-accent/90 text-black"
-            >
-              <Play className="h-4 w-4 mr-2" />
-              Start Workout
-            </Button>
+            {SHOW_SELF_LOGGING && (
+              <Button 
+                onClick={() => setLocation('/workout-logging?mode=voice')}
+                size="sm"
+                className="bg-thrst-accent hover:bg-thrst-accent/90 text-black"
+              >
+                <Play className="h-4 w-4 mr-2" />
+                Start Workout
+              </Button>
+            )}
           </div>
 
           {workouts && workouts.length > 0 ? (
@@ -561,13 +574,15 @@ export default function ClientPortal({ user, onLogout }: ClientPortalProps) {
                     Your coach will assign workouts for you
                   </p>
                 </div>
-                <Button 
-                  onClick={() => setLocation('/workout-logging?mode=voice')}
-                  className="bg-thrst-accent hover:bg-thrst-accent/90 text-black"
-                >
-                  <Play className="h-4 w-4 mr-2" />
-                  Start Free Workout
-                </Button>
+                {SHOW_SELF_LOGGING && (
+                  <Button 
+                    onClick={() => setLocation('/workout-logging?mode=voice')}
+                    className="bg-thrst-accent hover:bg-thrst-accent/90 text-black"
+                  >
+                    <Play className="h-4 w-4 mr-2" />
+                    Start Free Workout
+                  </Button>
+                )}
               </div>
             </GlassCard>
           )}

@@ -33,7 +33,8 @@ import {
   Users,
   Timer,
   Target,
-  Loader2
+  Loader2,
+  Trash2,
 } from "lucide-react";
 import { WorkoutImport } from '@/components/workout/WorkoutImport';
 
@@ -48,9 +49,10 @@ const workoutFormSchema = z.object({
   scheduledDate: z.string().min(1, "Scheduled date is required"),
   exercises: z.array(z.object({
     name: z.string().min(1, "Exercise name is required"),
-    sets: z.number().min(1, "At least 1 set is required"),
-    reps: z.number().min(1, "At least 1 rep is required"),
-    weight: z.number().optional(),
+    // Free-text details; coaches can write anything like "10 reps, 2 sets"
+    sets: z.string().min(1, "Details are required"),
+    // Optional explanation/comment per exercise
+    comment: z.string().optional(),
   })).min(1, "At least one exercise is required"),
 });
 
@@ -73,12 +75,36 @@ export default function WorkoutManagement({ user }: WorkoutManagementProps) {
     return `${y}-${m}-${d}T${hh}:${mm}`;
   };
 
+  const handleDeleteWorkout = async (w: { id: string; name?: string }) => {
+    try {
+      const ok = window.confirm(`Delete workout${w.name ? ` "${w.name}"` : ''}? This can be restored later.`);
+      if (!ok) return;
+      const res = await fetch(`/api/coach/workouts/${w.id}`, {
+        method: 'DELETE',
+        headers: {
+          ...getAuthHeaders(),
+        },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to delete workout');
+      }
+      await queryClient.invalidateQueries({ queryKey: ['/api/coach/workouts'] });
+      toast({ title: 'Workout deleted', description: 'The workout was moved to trash.' });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e?.message || 'Failed to delete workout', variant: 'destructive' });
+    }
+  };
+
   // Template utilities (localStorage)
   type WorkoutTemplate = {
     id: string;
     name: string;
     description?: string;
-    exercises: { name: string; sets: number; reps: number; weight?: number | null }[];
+    exercises: Array<{
+      name: string;
+      sets: string;
+    }>;
   };
 
   const TEMPLATE_KEY = 'gc_workout_templates';
@@ -122,9 +148,8 @@ export default function WorkoutManagement({ user }: WorkoutManagementProps) {
       description: w.description || '',
       exercises: (w.exercises || []).map((ex: any) => ({
         name: ex.name,
-        sets: Number(ex.sets)||1,
-        reps: Number(ex.reps)||1,
-        weight: typeof ex.weight === 'number' ? ex.weight : null,
+        sets: String((ex as any).sets ?? ''),
+        ...(ex.comment ? { comment: String(ex.comment) } : {}),
       })),
     };
     writeTemplates([t, ...templates].slice(0, 50));
@@ -141,7 +166,9 @@ export default function WorkoutManagement({ user }: WorkoutManagementProps) {
         clientId: String(w.clientId || ''),
         scheduledDate: formatLocalDateTime(new Date()),
         exercises: (w.exercises || []).map((ex: any) => ({
-          name: ex.name || '', sets: Number(ex.sets)||1, reps: Number(ex.reps)||1, weight: typeof ex.weight==='number'?ex.weight:0,
+          name: ex.name || '',
+          sets: String((ex as any).sets ?? ''),
+          comment: typeof ex.comment === 'string' ? ex.comment : '',
         })),
       });
     }, 0);
@@ -152,7 +179,11 @@ export default function WorkoutManagement({ user }: WorkoutManagementProps) {
     if (!tpl) return;
     form.setValue('name', tpl.name);
     form.setValue('description', tpl.description || '');
-    form.setValue('exercises', tpl.exercises.map(ex => ({ name: ex.name, sets: ex.sets, reps: ex.reps, weight: ex.weight ?? 0 })));
+    form.setValue('exercises', tpl.exercises.map(ex => ({
+      name: ex.name,
+      sets: ex.sets,
+      comment: (ex as any).comment || '',
+    })));
   };
 
   const { data: clientsData, isFetching: isFetchingClients, refetch: refetchClients } = useQuery({
@@ -261,7 +292,7 @@ export default function WorkoutManagement({ user }: WorkoutManagementProps) {
       description: "",
       clientId: "",
       scheduledDate: formatLocalDateTime(new Date()),
-      exercises: [{ name: "", sets: 1, reps: 1, weight: 0 }],
+      exercises: [{ name: "", sets: "", comment: "" }],
     },
   });
 
@@ -279,10 +310,9 @@ export default function WorkoutManagement({ user }: WorkoutManagementProps) {
         // Send as epoch ms to preserve the intended local datetime without timezone shifts
         scheduledDate: new Date(formData.scheduledDate).getTime(),
         exercises: formData.exercises.map(ex => ({
-          ...ex,
-          sets: Number(ex.sets),
-          reps: Number(ex.reps),
-          weight: ex.weight !== undefined && ex.weight !== null ? Number(ex.weight) : null,
+          name: ex.name,
+          sets: String(ex.sets),
+          ...(ex.comment ? { comment: ex.comment } : {}),
         })),
       };
 
@@ -468,7 +498,7 @@ export default function WorkoutManagement({ user }: WorkoutManagementProps) {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <Label className="text-base font-semibold">Exercises</Label>
-                    <Button type="button" onClick={() => appendExercise({ name: "", sets: 1, reps: 1, weight: 0 })} size="sm" variant="outline">
+                    <Button type="button" onClick={() => appendExercise({ name: "", sets: "", comment: "" })} size="sm" variant="outline">
                       <Plus className="h-3 w-3 mr-1" />
                       Add Exercise
                     </Button>
@@ -490,7 +520,7 @@ export default function WorkoutManagement({ user }: WorkoutManagementProps) {
                         </Button>
                       </div>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <FormField
                           control={form.control}
                           name={`exercises.${index}.name`}
@@ -511,7 +541,7 @@ export default function WorkoutManagement({ user }: WorkoutManagementProps) {
                             <FormItem>
                               <FormLabel htmlFor={`exercises.${index}.sets`}>Sets</FormLabel>
                               <FormControl>
-                                <Input {...field} id={`exercises.${index}.sets`} type="number" min="1" onChange={e => field.onChange(parseInt(e.target.value) || 1)} />
+                                <Input {...field} id={`exercises.${index}.sets`} type="text" placeholder="e.g., 10 reps, 2 sets; or any details" />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -519,25 +549,12 @@ export default function WorkoutManagement({ user }: WorkoutManagementProps) {
                         />
                         <FormField
                           control={form.control}
-                          name={`exercises.${index}.reps`}
+                          name={`exercises.${index}.comment`}
                           render={({ field }) => (
-                            <FormItem>
-                              <FormLabel htmlFor={`exercises.${index}.reps`}>Reps</FormLabel>
+                            <FormItem className="md:col-span-3">
+                              <FormLabel htmlFor={`exercises.${index}.comment`}>Comment</FormLabel>
                               <FormControl>
-                                <Input {...field} id={`exercises.${index}.reps`} type="number" min="1" onChange={e => field.onChange(parseInt(e.target.value) || 1)} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name={`exercises.${index}.weight`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel htmlFor={`exercises.${index}.weight`}>Weight (kg)</FormLabel>
-                              <FormControl>
-                                <Input {...field} id={`exercises.${index}.weight`} type="number" min="0" step="0.5" placeholder="0" onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
+                                <Textarea {...field} id={`exercises.${index}.comment`} placeholder="Notes/instructions for this exercise (optional)" />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -638,9 +655,7 @@ export default function WorkoutManagement({ user }: WorkoutManagementProps) {
                 <div className="space-y-1">
                   {Array.isArray(workout.exercises) && workout.exercises.slice(0, 3).map((exercise: any, index: number) => (
                     <div key={index} className="text-xs text-muted-foreground">
-                      {exercise.name} - {exercise.sets}x{exercise.reps || 'N/A'}
-                      {exercise.weight && ` @ ${exercise.weight}kg`}
-                      {exercise.duration && ` (${exercise.duration}min)`}
+                      {exercise.name}{exercise.sets ? ` - ${exercise.sets}` : ''}{exercise.comment ? ` — ${exercise.comment}` : ''}
                     </div>
                   ))}
                   {Array.isArray(workout.exercises) && workout.exercises.length > 3 && (
@@ -689,9 +704,18 @@ export default function WorkoutManagement({ user }: WorkoutManagementProps) {
                     Complete
                   </Button>
                 )}
-                <div className="flex gap-2 flex-wrap">
+                <div className="flex gap-2 flex-wrap items-center">
                   <Button size="sm" variant="outline" onClick={() => handleDuplicateWorkout(workout)}>Duplicate</Button>
                   <Button size="sm" variant="ghost" onClick={() => handleSaveAsTemplate(workout)}>Save as Template</Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="h-8 w-8 p-0"
+                    title="Delete workout"
+                    onClick={() => handleDeleteWorkout(workout)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             </div>

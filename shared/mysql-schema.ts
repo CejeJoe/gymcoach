@@ -45,6 +45,7 @@ export const workouts = mysqlTable("workouts", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  deletedAt: timestamp("deleted_at"),
 });
 
 export const progressEntries = mysqlTable("progress_entries", {
@@ -178,9 +179,24 @@ export const insertClientSchema = createInsertSchema(clients, {
     email: z.string().email(),
     firstName: z.string().min(1),
     lastName: z.string().min(1),
+    phone: z.string().optional(),
   });
 
-export const insertWorkoutSchema = createInsertSchema(workouts).omit({ id: true, createdAt: true, updatedAt: true });
+// Simple, free-text exercise schema: only name and sets/details string
+export const exerciseSchema = z.object({
+  name: z.string().min(1),
+  // "sets" can include any details (e.g., "10 reps, 2 sets" or any free text)
+  sets: z.string().min(1),
+  // Optional explanation/comment per exercise
+  comment: z.string().optional(),
+  completed: z.boolean().optional(),
+});
+
+export const insertWorkoutSchema = createInsertSchema(workouts, {
+  exercises: z.array(exerciseSchema).default([]),
+  // Accept ISO string, epoch ms, or Date for scheduledDate
+  scheduledDate: z.union([z.string(), z.number(), z.date()]).optional(),
+}).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export const insertProgressEntrySchema = createInsertSchema(progressEntries).omit({ id: true, createdAt: true });
 
 export const insertMessageSchema = createInsertSchema(messages);

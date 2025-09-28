@@ -1,10 +1,11 @@
 export interface AuthUser {
   id: string;
   email: string;
-  role: 'coach' | 'client';
+  role: 'coach' | 'client' | 'admin';
   firstName: string;
   lastName: string;
   avatar?: string;
+  phone?: string | null;
 }
 
 export interface AuthResponse {
@@ -31,10 +32,10 @@ export interface ClientStats {
 export interface Exercise {
   id?: string;
   name: string;
-  sets: number;
-  reps: number | null;
-  weight?: number;
-  duration?: number;
+  // Free-text details (e.g., "10 reps, 2 sets" or any description)
+  sets: string;
+  // Optional flags/text for UI; no numeric enforcement
+  comment?: string;
   completed?: boolean;
 }
 

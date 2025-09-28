@@ -48,16 +48,17 @@ export function ClientProfile({ client, onBack, onEdit, onMessage, isEditing, on
     ? Math.min(100, Math.max(0, ((client.currentWeight - client.targetWeight) / (client.currentWeight - client.targetWeight)) * 100))
     : 0;
 
-  // Workout creation form
+  // Workout creation form (free-text exercises: name + sets/details string)
   const workoutFormSchema = z.object({
     name: z.string().min(1, "Workout name is required"),
     description: z.string().optional(),
     scheduledDate: z.string().min(1, "Scheduled date is required"),
     exercises: z.array(z.object({
       name: z.string().min(1, "Exercise name is required"),
-      sets: z.number().min(1, "At least 1 set is required"),
-      reps: z.number().min(1, "At least 1 rep is required"),
-      weight: z.number().optional(),
+      // Coaches can write anything like "10 reps, 2 sets" or other details
+      sets: z.string().min(1, "Details are required"),
+      // Optional explanation/comment per exercise
+      comment: z.string().optional(),
     })).min(1, "At least one exercise is required"),
   });
 
@@ -69,7 +70,7 @@ export function ClientProfile({ client, onBack, onEdit, onMessage, isEditing, on
       name: "",
       description: "",
       scheduledDate: new Date().toISOString().slice(0, 16),
-      exercises: [{ name: "", sets: 1, reps: 1, weight: 0 }],
+      exercises: [{ name: "", sets: "", comment: "" }],
     },
   });
 
@@ -85,12 +86,9 @@ export function ClientProfile({ client, onBack, onEdit, onMessage, isEditing, on
       const payload = {
         ...data,
         clientId: client.id,
-        exercises: (data.exercises || []).filter(ex => ex.name.trim() !== '').map(ex => ({
-          ...ex,
-          sets: Number(ex.sets),
-          reps: Number(ex.reps),
-          weight: ex.weight ? Number(ex.weight) : 0,
-        })),
+        exercises: (data.exercises || [])
+          .filter(ex => (ex.name || '').trim() !== '')
+          .map(ex => ({ name: ex.name, sets: String(ex.sets), ...(ex.comment ? { comment: ex.comment } : {}) })),
       };
 
       const res = await fetch('/api/coach/workouts', {
@@ -186,13 +184,13 @@ export function ClientProfile({ client, onBack, onEdit, onMessage, isEditing, on
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <FormLabel className="text-base">Exercises</FormLabel>
-                      <Button type="button" size="sm" variant="outline" onClick={() => appendExercise({ name: "", sets: 1, reps: 1, weight: 0 })}>
+                      <Button type="button" size="sm" variant="outline" onClick={() => appendExercise({ name: "", sets: "", comment: "" })}>
                         <Plus className="h-3 w-3 mr-1" /> Add Exercise
                       </Button>
                     </div>
 
                     {exerciseFields.map((f, index) => (
-                      <div key={f.id} className="grid grid-cols-1 md:grid-cols-4 gap-3 p-3 border rounded-md">
+                      <div key={f.id} className="grid grid-cols-1 md:grid-cols-6 gap-3 p-3 border rounded-md">
                         <FormField
                           control={workoutForm.control}
                           name={`exercises.${index}.name`}
@@ -213,7 +211,7 @@ export function ClientProfile({ client, onBack, onEdit, onMessage, isEditing, on
                             <FormItem>
                               <FormLabel>Sets</FormLabel>
                               <FormControl>
-                                <Input type="number" min={1} value={field.value} onChange={e => field.onChange(parseInt(e.target.value) || 1)} />
+                                <Input type="text" placeholder="e.g., 10 reps, 2 sets; or any details" {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -221,12 +219,12 @@ export function ClientProfile({ client, onBack, onEdit, onMessage, isEditing, on
                         />
                         <FormField
                           control={workoutForm.control}
-                          name={`exercises.${index}.reps`}
+                          name={`exercises.${index}.comment`}
                           render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Reps</FormLabel>
+                            <FormItem className="md:col-span-6">
+                              <FormLabel>Comment</FormLabel>
                               <FormControl>
-                                <Input type="number" min={1} value={field.value} onChange={e => field.onChange(parseInt(e.target.value) || 1)} />
+                                <Textarea placeholder="Notes/instructions for this exercise (optional)" {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -234,12 +232,64 @@ export function ClientProfile({ client, onBack, onEdit, onMessage, isEditing, on
                         />
                         <FormField
                           control={workoutForm.control}
-                          name={`exercises.${index}.weight`}
+                          name={`exercises.${index}.repsMin`}
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Weight (kg)</FormLabel>
+                              <FormLabel>Reps Min</FormLabel>
                               <FormControl>
-                                <Input type="number" min={0} step={0.5} value={field.value ?? 0} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
+                                <Input type="number" min={0} value={field.value as any} onChange={e => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value))} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={workoutForm.control}
+                          name={`exercises.${index}.repsMax`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Reps Max</FormLabel>
+                              <FormControl>
+                                <Input type="number" min={0} value={field.value as any} onChange={e => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value))} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={workoutForm.control}
+                          name={`exercises.${index}.weightMin`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Weight Min (kg)</FormLabel>
+                              <FormControl>
+                                <Input type="number" min={0} step={0.5} value={field.value as any} onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={workoutForm.control}
+                          name={`exercises.${index}.weightMax`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Weight Max (kg)</FormLabel>
+                              <FormControl>
+                                <Input type="number" min={0} step={0.5} value={field.value as any} onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={workoutForm.control}
+                          name={`exercises.${index}.comment`}
+                          render={({ field }) => (
+                            <FormItem className="md:col-span-6">
+                              <FormLabel>Comment</FormLabel>
+                              <FormControl>
+                                <Textarea {...field} placeholder="Notes/instructions for this exercise (optional)" />
                               </FormControl>
                               <FormMessage />
                             </FormItem>

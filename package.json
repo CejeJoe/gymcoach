@@ -13,7 +13,8 @@
     "db:push": "drizzle-kit push --config drizzle.config.ts",
     "db:ensure:messages": "tsx server/ensure-messages-table.ts",
     "migrate:sqlite:mysql": "tsx scripts/migrate-sqlite-to-mysql.ts",
-    "import:sqlite": "tsx scripts/import-from-sqlite.ts"
+    "import:sqlite": "tsx scripts/import-from-sqlite.ts",
+    "promote:admin": "tsx scripts/promote-admin.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.2",

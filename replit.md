@@ -89,3 +89,76 @@ The application implements a comprehensive design system:
 - **JSON Web Tokens**: Stateless authentication token management
 - **Bcrypt**: Secure password hashing and comparison
 - **Connect PG Simple**: PostgreSQL session store for Express sessions
+
+## Admin Portal & Coach Registration (Phase 1)
+
+This phase introduces the Admin/Owner portal and a public "Register as Coach" flow with email verification and admin approval. Changes are additive and non-breaking.
+
+### New Database Tables
+- `shared/schema.ts`:
+  - `coach_profiles` (status: `pending | active | suspended`, phone, bio, specialties)
+  - `email_verifications` (token, expiresAt, usedAt)
+  - `audit_logs` (reserved for future use)
+  - Users: added `emailVerifiedAt` and role now supports `admin`.
+
+Run migrations (drizzle push):
+
+```bash
+npm run db:push
+```
+
+### Environment Variables
+See `.env.example` for full list. Recommended for Phase 1:
+
+```bash
+EMAIL_VERIFY=true
+APPROVAL_REQUIRED=true
+ENABLE_ADMIN_MUTATION=false
+JWT_SECRET=your-strong-secret
+```
+
+On Render, set these under the service's Environment.
+
+### Backend Endpoints
+- Public:
+  - `POST /api/auth/register-coach` – Creates a coach user (role=coach), pending profile, and an email verification token. Prints a verify URL in logs for development.
+  - `GET /api/auth/verify-email?token=...` – Marks the user as email-verified.
+- Auth:
+  - `POST /api/auth/login` – If `EMAIL_VERIFY=true`, coach login requires `emailVerifiedAt`. If `APPROVAL_REQUIRED=true`, coach login requires `coach_profiles.status === 'active'`.
+- Admin (read-only for Phase 1):
+  - `GET /api/admin/coaches` – List coaches with profile status and client count.
+  - `GET /api/admin/coaches/:id` – Detail view.
+  - `PATCH /api/admin/coaches/:id` – Present but gated behind `ENABLE_ADMIN_MUTATION`. Defaults to 405 in Phase 1.
+
+### Frontend Routes
+- Public:
+  - `/register-coach` – UI form only; posts to `POST /api/auth/register-coach`.
+- Admin:
+  - `/admin/coaches` – List of coaches.
+  - `/admin/coaches/:id` – Detail view with disabled actions by default.
+- Root routing:
+  - Admin users land on the Admin Coaches list.
+  - Coaches land on Coach Dashboard.
+  - Clients land on Client Portal.
+
+### Promote an Admin
+Promote a user to admin with the helper script:
+
+```bash
+npm run promote:admin -- --email=owner@example.com
+```
+
+This sets the user's role to `admin` and marks email as verified.
+
+### Test Flow (Local)
+1. Set envs from `.env.example` (at least `DATABASE_URL`, `JWT_SECRET`, `EMAIL_VERIFY=true`, `APPROVAL_REQUIRED=true`).
+2. Apply schema: `npm run db:push`.
+3. Start dev server: `npm run dev`.
+4. Visit `/register-coach` and submit the form.
+5. Copy the verification URL from server logs and open it to verify.
+6. Promote an admin account (or use an existing admin) and visit `/admin/coaches`.
+7. Confirm the newly registered coach is `pending`. (Approval action is gated in Phase 1.)
+
+### Notes
+- Email provider integration is left as a TODO. The verify URL is logged in development as a hint.
+- Admin mutations can be enabled later via `ENABLE_ADMIN_MUTATION=true`.

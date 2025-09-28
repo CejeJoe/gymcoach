@@ -66,7 +66,8 @@
   --sidebar-accent-foreground: hsl(158, 100%, 40%);
   --sidebar-border: hsl(0, 0%, 90%);
   --sidebar-ring: var(--thrst-accent);
-  --radius: 0.75rem;
+  /* Global corner radius used by most components */
+  --radius: 1rem;
 }
 
 .dark {
@@ -132,6 +133,8 @@
     background: rgba(255, 255, 255, 0.1);
     backdrop-filter: blur(20px);
     border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: var(--radius);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.12);
   }
   
   .dark .glass-morphism {
@@ -150,6 +153,23 @@
     border-radius: var(--radius);
     height: 100%;
     width: 100%;
+  }
+
+  /* Form elements rounding for a softer look */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="datetime-local"],
+  textarea,
+  select {
+    border-radius: var(--radius);
+  }
+
+  /* Card helper for tiles (stats, list items) */
+  .tile {
+    border-radius: var(--radius);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
   }
   
   /* Premium animations */

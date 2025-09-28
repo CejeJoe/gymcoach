@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 import { authenticateToken, AuthenticatedRequest } from './auth';
 import { db } from './db';
 import { eq, and, desc } from 'drizzle-orm';
-import { workoutSessions, workoutEntries, clients, workouts } from '@shared/mysql-schema';
+import { workoutSessions, workoutEntries, clients, workouts } from '@shared/schema';
 import { storage } from './storage';
 
 

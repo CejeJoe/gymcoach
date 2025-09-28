@@ -4,6 +4,8 @@ import workoutRoutes from "./workout-routes";
 import reportsRoutes from "./reports-routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { scheduler } from "./scheduler";
+import { db } from "./db";
+import { sql } from "drizzle-orm";
 
 const app = express();
 // Disable ETag to prevent conditional 304 responses on dynamic API routes
@@ -59,6 +61,28 @@ app.use((req, res, next) => {
 
 (async () => {
   // Table creation is now handled by Drizzle migrations (db:push). Ensure you've run migrations before starting.
+  // Minimal dev safety: ensure critical columns/tables exist to avoid runtime 500s if migrations weren't run
+  try {
+    await db.execute(sql`alter table "users" add column if not exists "phone" varchar`);
+  } catch (e: any) {
+    log(`ensure users.phone failed: ${e?.message || e}`, "schema");
+  }
+  try {
+    await db.execute(sql`
+      create table if not exists "usage_events" (
+        "id" varchar primary key,
+        "event_type" text not null,
+        "actor_type" text,
+        "actor_id" varchar,
+        "coach_id" varchar,
+        "client_id" varchar,
+        "metadata" jsonb,
+        "created_at" timestamp default now()
+      )
+    `);
+  } catch (e: any) {
+    log(`ensure usage_events failed: ${e?.message || e}`, "schema");
+  }
 
   // Mount workout routes so /api/workouts endpoints are available
   app.use("/api/workouts", workoutRoutes);

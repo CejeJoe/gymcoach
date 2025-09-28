@@ -8,10 +8,12 @@ export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
-  role: text("role", { enum: ['coach', 'client'] }).notNull(),
+  role: text("role", { enum: ['coach', 'client', 'admin'] }).notNull(),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   avatar: text("avatar"),
+  phone: varchar("phone"),
+  emailVerifiedAt: timestamp("email_verified_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -43,6 +45,7 @@ export const workouts = pgTable("workouts", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  deletedAt: timestamp("deleted_at"),
 });
 
 export const progressEntries = pgTable("progress_entries", {
@@ -146,6 +149,50 @@ export const workoutEntries = pgTable("workout_entries", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Admin/Coach management tables
+export const coachProfiles = pgTable("coach_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  status: varchar("status").notNull().default('pending'), // pending | active | suspended
+  bio: text("bio"),
+  specialties: jsonb("specialties"),
+  phone: varchar("phone"),
+  approvedAt: timestamp("approved_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const emailVerifications = pgTable("email_verifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  token: varchar("token").notNull(),
+  expiresAt: timestamp("expires_at"),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const auditLogs = pgTable("audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  actorId: varchar("actor_id").references(() => users.id),
+  action: text("action").notNull(),
+  targetType: text("target_type"),
+  targetId: varchar("target_id"),
+  meta: jsonb("meta"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Analytics events (append-only)
+export const usageEvents = pgTable("usage_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventType: text("event_type").notNull(),
+  actorType: text("actor_type"), // admin | coach | client | system
+  actorId: varchar("actor_id"),
+  coachId: varchar("coach_id"),
+  clientId: varchar("client_id"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   clientProfiles: many(clients, { relationName: "userToClient" }),
@@ -210,12 +257,29 @@ export const insertClientSchema = createInsertSchema(clients, {
   email: z.string().email(),
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
+  phone: z.string().optional(),
 });
 
-export const insertWorkoutSchema = createInsertSchema(workouts).omit({
+// Simple, free-text exercise schema: only name and sets/details as free text
+export const exerciseSchema = z.object({
+  name: z.string().min(1),
+  // "sets" here represents any details the coach wants to write (e.g., "10 reps, 2 sets")
+  sets: z.string().min(1),
+  // Optional explanation/comment per exercise
+  comment: z.string().optional(),
+  // Keep completed optional for UI toggles if needed; no numeric fields enforced
+  completed: z.boolean().optional(),
+});
+
+export const insertWorkoutSchema = createInsertSchema(workouts, {
+  exercises: z.array(exerciseSchema).default([]),
+  // Accept ISO string, epoch ms, or Date for scheduledDate
+  scheduledDate: z.union([z.string(), z.number(), z.date()]).optional(),
+}).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  deletedAt: true,
 });
 
 export const insertProgressEntrySchema = createInsertSchema(progressEntries).omit({
@@ -234,6 +298,10 @@ export const insertGroupMessageSchema = createInsertSchema(groupMessages);
 export const insertGroupMessageRecipientSchema = createInsertSchema(groupMessageRecipients);
 export const insertSessionLogSchema = createInsertSchema(sessionLogs);
 export const insertBodyMeasurementSchema = createInsertSchema(bodyMeasurements);
+export const insertCoachProfileSchema = createInsertSchema(coachProfiles);
+export const insertEmailVerificationSchema = createInsertSchema(emailVerifications);
+export const insertAuditLogSchema = createInsertSchema(auditLogs);
+export const insertUsageEventSchema = createInsertSchema(usageEvents);
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -255,3 +323,11 @@ export type InsertGroupMessage = typeof groupMessages.$inferInsert;
 export type GroupMessageRecipient = typeof groupMessageRecipients.$inferSelect;
 export type InsertGroupMessageRecipient = typeof groupMessageRecipients.$inferInsert;
 export type LoginRequest = z.infer<typeof loginSchema>;
+export type CoachProfile = typeof coachProfiles.$inferSelect;
+export type InsertCoachProfile = typeof coachProfiles.$inferInsert;
+export type EmailVerification = typeof emailVerifications.$inferSelect;
+export type InsertEmailVerification = typeof emailVerifications.$inferInsert;
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = typeof auditLogs.$inferInsert;
+export type UsageEvent = typeof usageEvents.$inferSelect;
+export type InsertUsageEvent = typeof usageEvents.$inferInsert;
